@@ -1,0 +1,725 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes mainMove {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+
+
+.animate-main-move {
+  animation: mainMove 25s linear infinite;
+}
+
+/* 🌊 Floating Water Effect */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-delay-1 {
+  animation: float 3.5s ease-in-out infinite 0.5s;
+}
+
+.animate-float-delay-2 {
+  animation: float 4s ease-in-out infinite 1s;
+}
+
+/* ✨ Pulse Glow */
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.9);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+/* 🧊 Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 🖱️ Hover Scales */
+.hover-scale {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* 🎥 Ken Burns Effect */
+@keyframes kenBurns {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1) translate(-1%, -1%);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-ken-burns {
+  animation: kenBurns 20s ease-in-out infinite alternate;
+}
+
+/* 🫧 Blob Animation for Login */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+
+/* =========================================
+   SCENE SPECIFIC ANIMATIONS
+   ========================================= */
+
+/* 🍃 LEAVES (Hero 1) */
+@keyframes fall {
+  0% {
+    top: -10%;
+    transform: translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 110%;
+    transform: translateX(100px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.leaf {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 24 24' fill='%2365a30d' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M17.06 13.9C16.59 16.42 14.54 18.23 12 18.23C9.46 18.23 7.41 16.42 6.94 13.48C6.88 13.56 7.44 13.25 7.69 13.48C9.53 15.19 12 15.19 13.84 13.48C14.07 13.26 14.65 13.59 14.56 13.9H17.06ZM8.5 7.5C8.5 9.43 10.07 11 12 11C13.93 11 15.5 9.43 15.5 7.5C15.5 5.57 13.93 4 12 4C10.07 4 8.5 5.57 8.5 7.5Z'/%3E%3Cpath d='M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12ZM19 12C19 8.13 15.87 5 12 5C8.13 5 5 8.13 5 12C5 15.87 8.13 19 12 19C15.87 19 19 15.87 19 12Z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.6;
+  z-index: 20;
+  animation: fall 10s linear infinite;
+}
+
+.leaf:nth-child(1) {
+  left: 10%;
+  animation-duration: 8s;
+  animation-delay: 0s;
+}
+
+.leaf:nth-child(2) {
+  left: 30%;
+  animation-duration: 12s;
+  animation-delay: 2s;
+}
+
+.leaf:nth-child(3) {
+  left: 60%;
+  animation-duration: 10s;
+  animation-delay: 4s;
+}
+
+.leaf:nth-child(4) {
+  left: 80%;
+  animation-duration: 14s;
+  animation-delay: 1s;
+}
+
+
+/* ☁️ CLOUDS (Hero 1 & 4) */
+@keyframes driftCloud {
+  from {
+    transform: translateX(-10%);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.5;
+  }
+
+  90% {
+    opacity: 0.5;
+  }
+
+  to {
+    transform: translateX(110vw);
+    opacity: 0;
+  }
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50px;
+  filter: blur(20px);
+  z-index: 15;
+  animation: driftCloud 30s linear infinite;
+}
+
+
+/* ❄️ SNOW (Hero 2 - Winter) */
+@keyframes snowfall {
+  0% {
+    transform: translateY(-10vh) translateX(0);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(110vh) translateX(20px);
+    opacity: 0.3;
+  }
+}
+
+.snow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.8;
+  filter: blur(1px);
+  animation: snowfall linear infinite;
+}
+
+.snow:nth-child(1) {
+  left: 10%;
+  animation-duration: 5s;
+  animation-delay: 0s;
+}
+
+.snow:nth-child(2) {
+  left: 20%;
+  animation-duration: 7s;
+  animation-delay: 1s;
+  width: 6px;
+  height: 6px;
+}
+
+.snow:nth-child(3) {
+  left: 40%;
+  animation-duration: 4s;
+  animation-delay: 2s;
+}
+
+.snow:nth-child(4) {
+  left: 60%;
+  animation-duration: 6s;
+  animation-delay: 0.5s;
+  width: 10px;
+  height: 10px;
+}
+
+.snow:nth-child(5) {
+  left: 80%;
+  animation-duration: 5.5s;
+  animation-delay: 3s;
+}
+
+.snow:nth-child(6) {
+  left: 90%;
+  animation-duration: 8s;
+  animation-delay: 1.5s;
+}
+
+
+/* 🕊️ BIRDS (Hero 3 - Beach/Sky) */
+@keyframes flyBird {
+  0% {
+    transform: translateX(-10vw) translateY(20px) scale(0.5);
+  }
+
+  25% {
+    transform: translateX(30vw) translateY(-10px) scale(0.8);
+  }
+
+  50% {
+    transform: translateX(60vw) translateY(10px) scale(1);
+  }
+
+  75% {
+    transform: translateX(90vw) translateY(-20px) scale(0.8);
+  }
+
+  100% {
+    transform: translateX(110vw) translateY(0px) scale(0.5);
+  }
+}
+
+.bird {
+  position: absolute;
+  width: 40px;
+  height: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='black' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M22.8 3.5c-0.2 0-0.4 0.1-0.6 0.2 -1.2 0.9-2.5 1.7-3.9 2.1 -1.4 0.4-2.8 0.5-4.2 0.1 -1.4-0.4-2.6-1.3-3.6-2.5 -0.3-0.3-0.7-0.4-1.1-0.2 -0.4 0.2-0.6 0.6-0.5 1 0.4 2.8 1.9 5.3 4.1 7 2.2 1.7 5 2.5 7.7 2.1 0.4-0.1 0.7-0.4 0.7-0.8 0-0.4-0.3-0.8-0.7-0.9 -2.2 0.3-4.5-0.3-6.3-1.6 -1.8-1.3-3-3.4-3.3-5.6 1.4 1.1 3 1.6 4.7 1.2 1.7-0.4 3.2-1.4 4.3-2.7 0.2-0.2 0.4-0.4 0.7-0.4 0.6 0 1.2 0.4 1.5 1l0.5 1.1c0.1 0.3 0.4 0.5 0.7 0.5 0 0 0 0 0.1 0 0.3-0.1 0.6-0.3 0.6-0.6l-0.6-1.8c-0.3-0.8-1-1.3-1.8-1.3z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.7;
+  z-index: 25;
+  animation: flyBird 12s linear infinite;
+}
+
+.bird:nth-child(1) {
+  top: 20%;
+  animation-delay: 0s;
+}
+
+.bird:nth-child(2) {
+  top: 25%;
+  animation-delay: 2s;
+  transform: scale(0.8);
+}
+
+
+/* ✨ TWINKLES/STARS (Hero 4 - Night/City) */
+@keyframes twinkle {
+
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.star {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 0 5px white;
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.star:nth-child(1) {
+  top: 10%;
+  left: 20%;
+  animation-duration: 2s;
+}
+
+.star:nth-child(2) {
+  top: 30%;
+  left: 80%;
+  animation-duration: 3s;
+}
+
+.star:nth-child(3) {
+  top: 50%;
+  left: 50%;
+  animation-duration: 4s;
+}
+
+
+
+
+/* Country text animation */
+@keyframes countrySlide {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-country {
+  animation: countrySlide 0.6s ease-out;
+}
+
+/* Ken Burns background zoom */
+@keyframes kenBurns {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.animate-ken-burns {
+  animation: kenBurns 10s ease-in-out forwards;
+}
+
+/* Infinite flag movement */
+@keyframes flagScroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-flags {
+  animation: flagScroll 12s linear infinite;
+}
+
+
+/* 🙈 HIDE SCROLLBAR */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes loop-left {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes loop-right {
+  0% {
+    transform: translateX(-50%);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* INTERNATIONAL → LEFT */
+.animate-loop {
+  animation: loop-left 25s linear infinite;
+}
+
+.animate-loop:hover {
+  animation-play-state: paused;
+}
+
+/* NATIONAL → RIGHT */
+.animate-loop-reverse {
+  animation: loop-right 25s linear infinite;
+}
+
+.animate-loop-reverse:hover {
+  animation-play-state: paused;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes splashPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) rotate(-8deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.splash-img {
+  animation: splashPop 0.5s ease forwards;
+}
+
+@keyframes splashText {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+    letter-spacing: 10px;
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    letter-spacing: 0px;
+  }
+}
+
+.splash-text {
+  animation: splashText 1s ease forwards;
+}
+
+/* SPLASH CARDS */
+.splashCard {
+  position: absolute;
+  width: 230px;
+  height: 320px;
+  object-fit: cover;
+  border-radius: 24px;
+  box-shadow: 0 40px 70px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: scale(0.75) translateY(40px);
+  transition: all 1.3s cubic-bezier(.2, .8, .2, 1);
+}
+
+
+@keyframes slowFloat {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-10px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.splashCard.show {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  animation: slowFloat 6s ease-in-out infinite;
+}
+
+.font-brand {
+  font-family: "Poppins", sans-serif;
+}
+
+@keyframes popupOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes popupClose {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.popup-open {
+  animation: popupOpen 0.25s ease-out forwards;
+}
+
+.popup-close {
+  animation: popupClose 0.25s ease-in forwards;
+}
+
+
+/* 🔄 Flip Card Animation */
+.flip-card {
+  perspective: 1000px;
+  background-color: transparent;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.flip-card:hover .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.flip-card-back {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: white;
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+}
+
+/* Utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* SHINE EFFECT */
+.shine-vertical::before {
+  content: "";
+  position: absolute;
+  top: -150%;
+  left: 0;
+  width: 100%;
+  height: 40%;
+  background: linear-gradient(to bottom,
+      transparent,
+      rgba(255, 255, 255, 0.65),
+      transparent);
+  pointer-events: none;
+}
+
+.shine-vertical:hover::before {
+  animation: shine-down 0.9s ease-in-out;
+}
+
+@keyframes shine-down {
+  from {
+    top: -150%;
+  }
+
+  to {
+    top: 150%;
+  }
+}
+
+@keyframes backgroundMove {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes popScale {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+@keyframes typeReveal {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-type-reveal {
+  animation: typeReveal 0.1s steps(1) forwards;
+}
