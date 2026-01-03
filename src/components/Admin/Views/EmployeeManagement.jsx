@@ -7,6 +7,7 @@ import {
     FiChevronDown,
     FiChevronUp,
 } from "react-icons/fi";
+import Pagination from "../Pagination";
 
 const API_BASE = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 
@@ -15,6 +16,8 @@ export default function EmployeeManagement() {
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [search, setSearch] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
 
     const [loading, setLoading] = useState(false);
@@ -41,9 +44,9 @@ export default function EmployeeManagement() {
     const [form, setForm] = useState(emptyForm);
 
     /* ================= GET ALL AGENTS ================= */
-    const fetchAgents = async () => {
+    const fetchAgents = async (page = 1) => {
         try {
-            const res = await fetch(`${API_BASE}/agents`);
+            const res = await fetch(`${API_BASE}/agents?page=${page}`);
             const json = await res.json();
 
             const apiAgents = json.agents.map((a) => ({
@@ -56,14 +59,15 @@ export default function EmployeeManagement() {
             }));
 
             setEmployeesData(apiAgents);
+            setTotalPages(json.total_pages || 1);
         } catch (err) {
             console.error("Failed to fetch agents", err);
         }
     };
 
     useEffect(() => {
-        fetchAgents();
-    }, []);
+        fetchAgents(currentPage);
+    }, [currentPage]);
 
     /* ================= ADD ================= */
     const handleAdd = () => {
@@ -156,7 +160,7 @@ export default function EmployeeManagement() {
 
                 if (!res.ok) throw new Error("Save failed");
 
-                await fetchAgents();
+                await fetchAgents(currentPage);
                 setShowForm(false);
                 setForm(emptyForm);
             } catch (err) {
@@ -186,7 +190,7 @@ export default function EmployeeManagement() {
 
         try {
             await fetch(`${API_BASE}/agents/${id}`, { method: "DELETE" });
-            await fetchAgents();
+            await fetchAgents(currentPage);
         } catch {
             alert("Delete failed");
         }
@@ -197,6 +201,9 @@ export default function EmployeeManagement() {
             .toLowerCase()
             .includes(search.toLowerCase())
     );
+    // Server-side pagination means we display filteredEmployees directly (which is the current page)
+    // Client-side slicing removed.
+
 
 
 
@@ -204,207 +211,219 @@ export default function EmployeeManagement() {
 
     /* ================= UI (UNCHANGED) ================= */
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* HEADER */}
-            <div className="p-6 py-3 flex justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white">
-                <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                        Employee Management
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                        Manage employee records & roles
-                    </p>
-                </div>
-
-                <div className="flex gap-3 items-center">
-                    <div className="relative">
-                        <FiSearch
-                            className="absolute left-3 top-2.5 text-indigo-600"
-                            size={16}
-                        />
-                        <input
-                            className="pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none"
-                            placeholder="Search..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+        <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* HEADER */}
+                <div className="p-6 py-3 flex justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900">
+                            Employee Management
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                            Manage employee records & roles
+                        </p>
                     </div>
 
-                    <button
-                        onClick={handleAdd}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
-                    >
-                        + Add Member
-                    </button>
+                    <div className="flex gap-3 items-center">
+                        <div className="relative">
+                            <FiSearch
+                                className="absolute left-3 top-2.5 text-indigo-600"
+                                size={16}
+                            />
+                            <input
+                                className="pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none"
+                                placeholder="Search..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+
+                        <button
+                            onClick={handleAdd}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
+                        >
+                            + Add Member
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* TABLE */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-100 border-b">
-                        <tr>
-                            {[
-                                "S.No",
-                                "Name",
-                                "Email",
-                                "Mobile",
-                                "Branch",
-                                "Role",
-                                "Actions",
-                            ].map((h) => (
-                                <th
-                                    key={h}
-                                    className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase"
-                                >
-                                    {h}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredEmployees.map((e, i) => (
-                            <tr key={e.id} className="border-b hover:bg-gray-50">
-                                <td className="px-4 py-3 text-center">{i + 1}</td>
-                                <td className="px-4 py-3 text-center">{e.name}</td>
-                                <td className="px-4 py-3 text-center">{e.email}</td>
-                                <td className="px-4 py-3 text-center">{e.phone}</td>
-                                <td className="px-4 py-3 text-center">{e.branch}</td>
-                                <td className="px-4 py-3 text-center">{e.role}</td>
-                                <td className="px-4 py-3 flex justify-center gap-2">
-                                    <button
-                                        onClick={() => handleEdit(e)}
-                                        className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
+                {/* TABLE */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-100 border-b">
+                            <tr>
+                                {[
+                                    "S.No",
+                                    "Agent ID",
+                                    "Name",
+                                    "Email",
+                                    "Mobile",
+                                    "Branch",
+                                    "Role",
+                                    "Actions",
+                                ].map((h) => (
+                                    <th
+                                        key={h}
+                                        className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase"
                                     >
-                                        <FiEdit />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(e.id)}
-                                        className="p-2 rounded-lg bg-red-50 text-red-600"
-                                    >
-                                        <FiTrash2 />
-                                    </button>
-                                </td>
+                                        {h}
+                                    </th>
+                                ))}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {filteredEmployees.map((e, i) => (
+                                <tr key={e.id} className="border-b hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-center">{(currentPage - 1) * 10 + i + 1}</td>
+                                    <td className="px-4 py-3 text-center text-gray-600 font-mono text-xs">{e.id}</td>
+                                    <td className="px-4 py-3 text-center">{e.name}</td>
+                                    <td className="px-4 py-3 text-center">{e.email}</td>
+                                    <td className="px-4 py-3 text-center">{e.phone}</td>
+                                    <td className="px-4 py-3 text-center">{e.branch}</td>
+                                    <td className="px-4 py-3 text-center">{e.role}</td>
+                                    <td className="px-4 py-3 flex justify-center gap-2">
+                                        <button
+                                            onClick={() => handleEdit(e)}
+                                            className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
+                                        >
+                                            <FiEdit />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(e.id)}
+                                            className="p-2 rounded-lg bg-red-50 text-red-600"
+                                        >
+                                            <FiTrash2 />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
 
-            {/* MODAL */}
-            {showForm && (
-                <div
-                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-                    onClick={() => setShowForm(false)}
-                >
+                {/* MODAL */}
+                {showForm && (
                     <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="bg-white w-full max-w-xl rounded-xl shadow-xl"
+                        className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+                        onClick={() => setShowForm(false)}
                     >
-                        <div className="px-5 py-4 border-b flex justify-between">
-                            <h3 className="text-lg font-bold">
-                                {isEdit ? "Edit Employee" : "Add Employee"}
-                            </h3>
-                            <button onClick={() => setShowForm(false)}>✕</button>
-                        </div>
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white w-full max-w-xl rounded-xl shadow-xl"
+                        >
+                            <div className="px-5 py-4 border-b flex justify-between">
+                                <h3 className="text-lg font-bold">
+                                    {isEdit ? "Edit Employee" : "Add Employee"}
+                                </h3>
+                                <button onClick={() => setShowForm(false)}>✕</button>
+                            </div>
 
-                        <div className="px-5 py-4 space-y-4">
-                            <input
-                                placeholder="First Name"
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.firstName}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        firstName: e.target.value,
-                                    })
-                                }
-                            />
-                            <input
-                                placeholder="Last Name"
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.lastName}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        lastName: e.target.value,
-                                    })
-                                }
-                            />
-                            <input
-                                placeholder="Email"
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.email}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        email: e.target.value,
-                                    })
-                                }
-                            />
-                            <input
-                                placeholder="Mobile Number"
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.phone}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        phone: e.target.value,
-                                    })
-                                }
-                            />
-                            <select
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.branch}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        branch: e.target.value,
-                                    })
-                                }
-                            >
-                                <option value="">Select Branch</option>
-                                {branches.map((b) => (
-                                    <option key={b}>{b}</option>
-                                ))}
-                            </select>
-                            <select
-                                className="border rounded-lg px-3 py-2 w-full"
-                                value={form.role}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        role: e.target.value,
-                                    })
-                                }
-                            >
-                                {roles.map((r) => (
-                                    <option key={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
+                            <div className="px-5 py-4 space-y-4">
+                                <input
+                                    placeholder="First Name"
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.firstName}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            firstName: e.target.value,
+                                        })
+                                    }
+                                />
+                                <input
+                                    placeholder="Last Name"
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.lastName}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            lastName: e.target.value,
+                                        })
+                                    }
+                                />
+                                <input
+                                    placeholder="Email"
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.email}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            email: e.target.value,
+                                        })
+                                    }
+                                />
+                                <input
+                                    placeholder="Mobile Number"
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.phone}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            phone: e.target.value,
+                                        })
+                                    }
+                                />
+                                <select
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.branch}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            branch: e.target.value,
+                                        })
+                                    }
+                                >
+                                    <option value="">Select Branch</option>
+                                    {branches.map((b) => (
+                                        <option key={b}>{b}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="border rounded-lg px-3 py-2 w-full"
+                                    value={form.role}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            role: e.target.value,
+                                        })
+                                    }
+                                >
+                                    {roles.map((r) => (
+                                        <option key={r}>{r}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                        <div className="px-5 py-4 border-t flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowForm(false)}
-                                className="px-4 py-2 bg-gray-200 rounded-lg"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={loading}
-                                className={`px-6 py-2 rounded-lg text-white ${loading
+                            <div className="px-5 py-4 border-t flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowForm(false)}
+                                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={loading}
+                                    className={`px-6 py-2 rounded-lg text-white ${loading
                                         ? "bg-indigo-300"
                                         : "bg-indigo-600"
-                                    }`}
-                            >
-                                {loading ? "Saving..." : "Save"}
-                            </button>
+                                        }`}
+                                >
+                                    {loading ? "Saving..." : "Save"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+
+            <div className="flex justify-center">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
+            </div>
+        </div >
     );
 }

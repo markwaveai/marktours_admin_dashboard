@@ -27,7 +27,9 @@ import ReportsLogs from "./Views/ReportsLogs";
 import CompanyPaid from "./Views/CompanyPaid";
 import TourAssignment from "./Views/TourAssignment";
 import EmployeeManagement from "./Views/EmployeeManagement";
+
 import CustomerInterested from "./Views/CustomerInterested";
+import DetailsTab from "./Views/DetailsTab";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -35,8 +37,7 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, component: <DashboardHome /> },
-    { name: "User Management", icon: Users, component: <UserManagement /> },
-    { name: "Employee Management", icon: Briefcase, component: <EmployeeManagement /> },
+    { name: "Details", icon: Users, component: <DetailsTab /> },
     { name: "Tour Management", icon: Plane, component: <TourManagement /> },
     { name: "Customer Interested", icon: Users, component: <CustomerInterested /> },
 
@@ -72,7 +73,7 @@ export default function AdminDashboard() {
           </button>
 
           <img
-            src="/assets/images/Layer 2.png"
+            src="/images/Layer 2.png"
             alt="Mark Tours"
             className="w-[90px]"
           />
@@ -93,18 +94,16 @@ export default function AdminDashboard() {
                       }
                     }}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all whitespace-nowrap
-                      ${
-                        isActive
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                      ${isActive
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
                       }
                       ${item.disabled ? "cursor-not-allowed opacity-70" : ""}
                     `}
                   >
                     <item.icon
-                      className={`w-5 h-5 mr-3 ${
-                        isActive ? "text-white" : "text-gray-400"
-                      }`}
+                      className={`w-5 h-5 mr-3 ${isActive ? "text-white" : "text-gray-400"
+                        }`}
                     />
                     {item.name}
                   </button>

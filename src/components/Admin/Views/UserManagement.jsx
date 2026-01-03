@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FiEdit, FiTrash2, FiSearch, FiX } from "react-icons/fi";
+import Pagination from "../Pagination";
 
 const BASE_URL = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 const AGENT_ID = 10001;
@@ -7,10 +8,16 @@ const AGENT_ID = 10001;
 export default function UserManagement() {
   const [usersData, setUsersData] = useState([]);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [extraDetails, setExtraDetails] = useState([]);
   const [extraLoading, setExtraLoading] = useState(false);
+
+  const [agentsList, setAgentsList] = useState([]);
+  const [agentSearch, setAgentSearch] = useState("");
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [originalUser, setOriginalUser] = useState(null);
@@ -21,7 +28,12 @@ export default function UserManagement() {
     email: "",
     mobile: "",
     branch: "",
+    branch: "",
     address: "",
+    dob: "",
+    pincode: "",
+    express_needs: "",
+    agent_id: "",
     is_active: true,
   };
 
@@ -29,22 +41,42 @@ export default function UserManagement() {
   const [viewImg, setViewImg] = useState(null);
 
   /* ================= FETCH USERS ================= */
-  const fetchUsers = async () => {
-    const res = await fetch(`${BASE_URL}/user-details`);
+  const fetchUsers = async (page = 1) => {
+    // Note: API supports search? If so add &search=${search}
+    // Assuming API keys: page, total_pages
+    const res = await fetch(`${BASE_URL}/user-details?page=${page}`);
     const data = await res.json();
     setUsersData(data.user_details || []);
+    setTotalPages(data.total_pages || 1);
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsers(currentPage);
+    fetchAgents();
+  }, [currentPage]);
+
+  const fetchAgents = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/agents`);
+      const data = await res.json();
+      setAgentsList(data.agents || []);
+    } catch (err) {
+      console.error("Failed to fetch agents", err);
+    }
+  };
 
   /* ================= SEARCH ================= */
+  // For filteredUsers, if search is local only:
   const filteredUsers = usersData.filter((u) =>
     `${u.name} ${u.email} ${u.mobile} ${u.branch}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  // Client-side slicing REMOVED since API is paginated
+  // If API search is not implemented, search only works on current page.
+  // const paginatedUsers = filteredUsers... (removed)
+
 
   /* ================= ROW CLICK ================= */
   const toggleRow = async (u) => {
@@ -69,16 +101,20 @@ export default function UserManagement() {
   const handleAddUser = () => {
     setForm(emptyForm);
     setOriginalUser(null);
+    setAgentSearch("");
     setShowForm(true);
   };
 
   /* ================= EDIT USER ================= */
   const handleEdit = (u) => {
     setOriginalUser(u);
-    setForm({ ...u });
+    setForm({ ...u, agent_id: u.agent_id || "", dob: u.dob || "", pincode: u.pincode || "", express_needs: u.express_needs || "" });
+    // Show Agent ID in search box
+    setAgentSearch(u.agent_id ? String(u.agent_id) : "");
     setShowForm(true);
   };
 
+  /* ================= SAVE USER ================= */
   /* ================= SAVE USER ================= */
   const handleSave = async () => {
     const isEdit = Boolean(originalUser);
@@ -86,102 +122,185 @@ export default function UserManagement() {
       ? `${BASE_URL}/user-details/${originalUser.user_id}`
       : `${BASE_URL}/user-details`;
 
-    const payload = { agent_id: AGENT_ID, ...form };
+    // Ensure agent_id is used from form if set, cast to Number
+    const payload = {
+      ...form,
+      agent_id: form.agent_id ? Number(form.agent_id) : AGENT_ID
+    };
 
-    const res = await fetch(url, {
-      method: isEdit ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (!res.ok) {
-      alert("Save failed");
-      return;
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Save Error:", errText);
+        alert(`Save failed: ${res.status} - ${errText || res.statusText}`);
+        return;
+      }
+
+      await fetchUsers(currentPage);
+      setShowForm(false);
+    } catch (err) {
+      console.error("Network Error:", err);
+      alert("Network exception occurred");
     }
-
-    await fetchUsers();
-    setShowForm(false);
   };
 
   /* ================= DELETE ================= */
   const handleDelete = async (id) => {
     if (!window.confirm("Delete user?")) return;
     await fetch(`${BASE_URL}/user-details/${id}`, { method: "DELETE" });
-    fetchUsers();
+    fetchUsers(currentPage);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow border">
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow border">
 
-      {/* ================= ADD / EDIT MODAL ================= */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-[420px] rounded-xl p-6">
-            <div className="flex justify-between mb-4">
-              <h3 className="text-lg font-bold">
-                {originalUser ? "Edit User" : "Add User"}
-              </h3>
-              <button onClick={() => setShowForm(false)}>
-                <FiX />
+        {/* ================= ADD / EDIT MODAL ================= */}
+        {showForm && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white w-[420px] rounded-xl p-6">
+              <div className="flex justify-between mb-4">
+                <h3 className="text-lg font-bold">
+                  {originalUser ? "Edit User" : "Add User"}
+                </h3>
+                <button onClick={() => setShowForm(false)}>
+                  <FiX />
+                </button>
+              </div>
+
+              {["name", "email", "mobile", "branch", "address"].map((f) => (
+                <input
+                  key={f}
+                  placeholder={f.toUpperCase()}
+                  value={form[f]}
+                  onChange={(e) =>
+                    setForm({ ...form, [f]: e.target.value })
+                  }
+                  className="w-full border px-3 py-2 rounded mb-3"
+                />
+              ))}
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input
+                  type="date"
+                  value={form.dob}
+                  onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="Date of Birth"
+                />
+                <input
+                  type="text"
+                  value={form.pincode}
+                  onChange={(e) => setForm({ ...form, pincode: e.target.value })}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="Pincode"
+                />
+              </div>
+
+              {/* Agent Search */}
+              <div className="relative mb-3">
+                <label className="text-xs text-gray-500 mb-1 block">Agent ID</label>
+                <input
+                  type="text"
+                  placeholder="Search Agent ID or Name..."
+                  value={agentSearch}
+                  onFocus={() => setShowAgentDropdown(true)}
+                  onChange={(e) => {
+                    setAgentSearch(e.target.value);
+                    setShowAgentDropdown(true);
+                  }}
+                  className="w-full border px-3 py-2 rounded"
+                />
+                {showAgentDropdown && agentSearch && (
+                  <div className="absolute z-10 w-full bg-white border rounded shadow-lg max-h-40 overflow-y-auto mt-1">
+                    {agentsList
+                      .filter(a =>
+                        a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
+                        String(a.agent_id).includes(agentSearch)
+                      )
+                      .map(a => (
+                        <div
+                          key={a.agent_id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                          onClick={() => {
+                            setForm({ ...form, agent_id: a.agent_id });
+                            setAgentSearch(String(a.agent_id));
+                            setShowAgentDropdown(false);
+                          }}
+                        >
+                          <span className="font-bold">{a.agent_id}</span> - {a.name} ({a.branch})
+                        </div>
+                      ))}
+                    {agentsList.filter(a =>
+                      a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
+                      String(a.agent_id).includes(agentSearch)
+                    ).length === 0 && (
+                        <div className="px-3 py-2 text-gray-400 text-sm">No agents found</div>
+                      )}
+                  </div>
+                )}
+                {/* Hidden input to store selected ID visually just for debug or reference if needed, 
+                      but logic uses form.agent_id */}
+              </div>
+
+              <textarea
+                value={form.express_needs}
+                onChange={(e) => setForm({ ...form, express_needs: e.target.value })}
+                className="w-full border px-3 py-2 rounded mb-3"
+                placeholder="Express your needs..."
+                rows={3}
+              />
+
+              <button
+                onClick={handleSave}
+                className="w-full bg-indigo-600 text-white py-2 rounded"
+              >
+                Save
               </button>
             </div>
+          </div>
+        )}
 
-            {["name", "email", "mobile", "branch", "address"].map((f) => (
-              <input
-                key={f}
-                placeholder={f.toUpperCase()}
-                value={form[f]}
-                onChange={(e) =>
-                  setForm({ ...form, [f]: e.target.value })
-                }
-                className="w-full border px-3 py-2 rounded mb-3"
+        {/* ================= IMAGE PREVIEW MODAL ================= */}
+        {viewImg && (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-in fade-in duration-200"
+            onClick={() => setViewImg(null)}
+          >
+            <div className="relative bg-white p-2 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => setViewImg(null)}
+                className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
+              >
+                <FiX size={20} className="text-gray-600" />
+              </button>
+              <img
+                src={viewImg}
+                alt="Document Preview"
+                className="w-full h-auto max-h-[80vh] object-contain rounded-xl"
               />
-            ))}
-
-            <button
-              onClick={handleSave}
-              className="w-full bg-indigo-600 text-white py-2 rounded"
-            >
-              Save
-            </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ================= IMAGE PREVIEW MODAL ================= */}
-      {viewImg && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-in fade-in duration-200"
-          onClick={() => setViewImg(null)}
-        >
-          <div className="relative bg-white p-2 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => setViewImg(null)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
-            >
-              <FiX size={20} className="text-gray-600" />
-            </button>
-            <img
-              src={viewImg}
-              alt="Document Preview"
-              className="w-full h-auto max-h-[80vh] object-contain rounded-xl"
-            />
+        {/* ================= HEADER ================= */}
+        <div className="p-4 md:p-6 flex flex-col sm:flex-row justify-between gap-4 border-b">
+          <div>
+            <h2 className="text-xl font-bold">Traveller Assessment</h2>
+            <p className="text-sm text-gray-500">
+              Manage users and traveller details
+            </p>
           </div>
-        </div>
-      )}
 
-      {/* ================= HEADER ================= */}
-      <div className="p-4 md:p-6 flex flex-col sm:flex-row justify-between gap-4 border-b">
-        <div>
-          <h2 className="text-xl font-bold">Traveller Assessment</h2>
-          <p className="text-sm text-gray-500">
-            Manage users and traveller details
-          </p>
-        </div>
-        
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* <div className="relative">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* <div className="relative">
             <FiSearch className="absolute left-3 top-3 text-gray-400" />
             <input
               className="w-full sm:w-auto pl-10 pr-4 py-2 border rounded"
@@ -190,248 +309,261 @@ export default function UserManagement() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div> */}
-<div className="relative w-full sm:w-[400px] md:w-[480px]">
-  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-  <input
-    className="w-full pl-10 px-6 pr-4 py-2.5 border rounded-lg text-sm
+            <div className="relative w-full sm:w-[400px] md:w-[480px]">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                className="w-full pl-10 px-6 pr-4 py-2.5 border rounded-lg text-sm
                focus:outline-none focus:ring-2 focus:ring-indigo-500"
-    placeholder="Search..."
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-  />
-</div>
-
-
-
-          <button
-  onClick={handleAddUser}
-  className="border border-blue-400 bg-blue-800 text-white rounded-lg px-2 h-[40px]"
-
- 
->
-  + Add User
-</button>
-  
-        </div>
-      </div>
-
-      {/* ================= TABLE WRAPPER ================= */}
-      <div className="overflow-x-auto">
-        {/* ================= TABLE HEADER ================= */}
-        <div className="grid px-6 py-3 text-xs font-semibold bg-gray-50 min-w-[800px]" style={{ gridTemplateColumns: '60px 1fr 1.2fr 120px 120px 100px 100px' }}>
-          <div>S.No</div>
-          <div>Name</div>
-          <div>Email</div>
-          <div>Mobile</div>
-          <div>Branch</div>
-          <div>Status</div>
-          <div>Actions</div>
-        </div>
-
-        {/* ================= USERS ================= */}
-        {filteredUsers.map((u, i) => (
-          <div key={u.user_id} className="border-b">
-
-
-            <div
-              onClick={() => toggleRow(u)}
-              className={`grid px-6 py-4 text-sm cursor-pointer min-w-[800px] transition-colors
-    ${expandedUserId === u.user_id
-                  ? "bg-blue-100 border-l-4 border-blue-500"
-                  : "bg-white hover:bg-blue-50"}
-  `}style={{gridTemplateColumns: "60px 1fr 1.2fr 120px 120px 100px 100px", }}
-            >
-
-              <div>{i + 1}</div>
-              <div className="font-medium">{u.name}</div>
-              <div>{u.email}</div>
-              <div>{u.mobile}</div>
-              <div>{u.branch}</div>
-              <div>{u.is_active ? "Active" : "Inactive"}</div>
-              <div className="flex gap-3">
-                <FiEdit
-                  className="text-indigo-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit(u);
-                  }}
-                />
-                <FiTrash2
-                  className="text-red-500"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(u.user_id);
-                  }}
-                />
-              </div>
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
 
-            {/* ================= EXTRA DETAILS ================= */}
-            {expandedUserId === u.user_id && (
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
-                {extraLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    <p className="ml-3 text-gray-600">Loading traveler details...</p>
-                  </div>
-                ) : extraDetails.length === 0 ? (
-                  <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500">No traveler details found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {extraDetails.map((d, idx) => (
-                      <div key={d.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-3 flex justify-between items-center">
-                          <h4 className="text-white font-semibold text-sm">
-                            Traveler #{idx + 1}: {d.name} {d.surname}
-                          </h4>
-                          {/* <span className={`px-3 py-1 rounded-full text-xs font-medium ${d.isagreed ? 'bg-green-400 text-green-900' : 'bg-yellow-400 text-yellow-900'
+
+
+            <button
+              onClick={handleAddUser}
+              className="border border-blue-400 bg-blue-800 text-white rounded-lg px-2 h-[40px]"
+
+
+            >
+              + Add User
+            </button>
+
+          </div>
+        </div>
+
+        {/* ================= TABLE WRAPPER ================= */}
+        <div className="overflow-x-auto">
+          {/* ================= TABLE HEADER ================= */}
+          <div className="grid px-6 py-3 text-xs font-semibold bg-gray-50 min-w-[800px]" style={{ gridTemplateColumns: '60px 1fr 1fr 1fr 1fr 1fr 100px 100px' }}>
+            <div>S.No</div>
+            <div>Name</div>
+            <div>Email</div>
+            <div>Mobile</div>
+            <div>Branch</div>
+            <div>Agent ID</div>
+            <div>Status</div>
+            <div>Actions</div>
+          </div>
+
+          {/* ================= USERS ================= */}
+          {/* ================= USERS ================= */}
+          {filteredUsers.map((u, i) => (
+            <div key={u.user_id} className="border-b">
+
+
+              <div
+                onClick={() => toggleRow(u)}
+                className={`grid px-6 py-4 text-sm cursor-pointer min-w-[800px] transition-colors
+    ${expandedUserId === u.user_id
+                    ? "bg-blue-100 border-l-4 border-blue-500"
+                    : "bg-white hover:bg-blue-50"}
+  `} style={{ gridTemplateColumns: "60px 1fr 1fr 1fr 1fr 1fr 100px 100px", }}
+              >
+
+                <div>{(currentPage - 1) * 10 + i + 1}</div>
+                <div className="font-medium">{u.name}</div>
+                <div>{u.email}</div>
+                <div>{u.mobile}</div>
+                <div>{u.branch}</div>
+                <div className="text-gray-600">{u.agent_id || '-'}</div>
+                <div>{u.is_active ? "Active" : "Inactive"}</div>
+                <div className="flex gap-3">
+                  <FiEdit
+                    className="text-indigo-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(u);
+                    }}
+                  />
+                  <FiTrash2
+                    className="text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(u.user_id);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* ================= EXTRA DETAILS ================= */}
+              {expandedUserId === u.user_id && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
+                  {extraLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                      <p className="ml-3 text-gray-600">Loading traveler details...</p>
+                    </div>
+                  ) : extraDetails.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                      <p className="text-gray-500">No traveler details found</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {extraDetails.map((d, idx) => (
+                        <div key={d.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                          {/* Header */}
+                          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-3 flex justify-between items-center">
+                            <h4 className="text-white font-semibold text-sm">
+                              Traveler #{idx + 1}: {d.name} {d.surname}
+                            </h4>
+                            {/* <span className={`px-3 py-1 rounded-full text-xs font-medium ${d.isagreed ? 'bg-green-400 text-green-900' : 'bg-yellow-400 text-yellow-900'
                             }`}>
                             {d.isagreed ? '✓ Agreed' : 'Pending'}
                           </span> */}
-                        </div>
+                          </div>
 
-                        <div className="p-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                            {/* Personal Information */}
-                            <div className="space-y-3">
-                              <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Personal Info</h5>
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-xs text-gray-500">Full Name</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.name} {d.surname}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Mobile</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.mobile || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Date of Birth</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.dob || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Gender</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.gender || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Nationality</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.nationality || 'N/A'}</p>
+                              {/* Personal Information */}
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Personal Info</h5>
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500">Full Name</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.name} {d.surname}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Mobile</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.mobile || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Date of Birth</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.dob || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Gender</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.gender || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Nationality</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.nationality || 'N/A'}</p>
+                                  </div>
                                 </div>
                               </div>
+
+                              {/* Passport Information */}
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Passport Details</h5>
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500">Passport Number</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Issued By</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.issuedby || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Date of Issue</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.dateofissued || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Date of Expiry</label>
+                                    <p className="text-sm font-medium text-gray-900">{d.dateofexpired || 'N/A'}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Tour & Documents */}
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Tour & Documents</h5>
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs text-gray-500">Tour Code</label>
+                                    <p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-500">Created At</label>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {new Date(d.created_at).toLocaleDateString('en-IN', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Document Links */}
+                                <div className="pt-3 space-y-2">
+                                  <label className="text-xs text-gray-500 block">Documents</label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {d.passport_image_url && (
+                                      <button
+                                        onClick={() => setViewImg(d.passport_image_url)}
+                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Passport
+                                      </button>
+                                    )}
+                                    {d.aadhar_front_url && (
+                                      <button
+                                        onClick={() => setViewImg(d.aadhar_front_url)}
+                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Aadhar Front
+                                      </button>
+                                    )}
+                                    {d.aadhar_back_url && (
+                                      <button
+                                        onClick={() => setViewImg(d.aadhar_back_url)}
+                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Aadhar Back
+                                      </button>
+                                    )}
+                                    {d.pancard_url && (
+                                      <button
+                                        onClick={() => setViewImg(d.pancard_url)}
+                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        PAN
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
                             </div>
-
-                            {/* Passport Information */}
-                            <div className="space-y-3">
-                              <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Passport Details</h5>
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-xs text-gray-500">Passport Number</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Issued By</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.issuedby || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Date of Issue</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.dateofissued || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Date of Expiry</label>
-                                  <p className="text-sm font-medium text-gray-900">{d.dateofexpired || 'N/A'}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tour & Documents */}
-                            <div className="space-y-3">
-                              <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Tour & Documents</h5>
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-xs text-gray-500">Tour Code</label>
-                                  <p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-500">Created At</label>
-                                  <p className="text-sm font-medium text-gray-900">
-                                    {new Date(d.created_at).toLocaleDateString('en-IN', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Document Links */}
-                              <div className="pt-3 space-y-2">
-                                <label className="text-xs text-gray-500 block">Documents</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {d.passport_image_url && (
-                                    <button
-                                      onClick={() => setViewImg(d.passport_image_url)}
-                                      className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                      Passport
-                                    </button>
-                                  )}
-                                  {d.aadhar_front_url && (
-                                    <button
-                                      onClick={() => setViewImg(d.aadhar_front_url)}
-                                      className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                      Aadhar Front
-                                    </button>
-                                  )}
-                                  {d.aadhar_back_url && (
-                                    <button
-                                      onClick={() => setViewImg(d.aadhar_back_url)}
-                                      className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                      Aadhar Back
-                                    </button>
-                                  )}
-                                  {d.pancard_url && (
-                                    <button
-                                      onClick={() => setViewImg(d.pancard_url)}
-                                      className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                      PAN
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+      </div>
+
+      <div className="flex justify-center">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
