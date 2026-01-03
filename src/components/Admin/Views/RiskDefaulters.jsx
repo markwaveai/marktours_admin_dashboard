@@ -1,7 +1,27 @@
-import usersData from "../../../data/users.json";
+
+import { useState, useEffect } from "react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
+
+const usersData = [
+    { id: 1, name: "Rajesh Kumar", riskLevel: "Critical", status: "Defaulted", emiAmount: "₹12,400", phone: "+91 98765 43210" },
+    { id: 2, name: "Amit Sharma", riskLevel: "High", status: "Overdue", emiAmount: "₹8,200", phone: "+91 98123 45678" }
+];
 
 export default function RiskDefaulters() {
-    const riskyUsers = usersData.filter(u => u.riskLevel === "High" || u.riskLevel === "Critical" || u.status === "Defaulted");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const riskyUsers = usersData.filter(u => u.riskLevel === "High" || u.riskLevel === "Critical" || u.status === "Defaulted");
+
+  if (loading) {
+      return <SkeletonLoader type="table" count={8} />;
+  }
 
     return (
         <div className="space-y-6">

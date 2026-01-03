@@ -1,82 +1,175 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { FiEdit, FiTrash2, FiSearch, FiX } from "react-icons/fi";
 import Pagination from "../Pagination";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 const BASE_URL = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 const AGENT_ID = 10001;
 
 export default function UserManagement() {
-  const [usersData, setUsersData] = useState([]);
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const fetchingRef = useRef(null);
 
-  const [expandedUserId, setExpandedUserId] = useState(null);
-  const [extraDetails, setExtraDetails] = useState([]);
-  const [extraLoading, setExtraLoading] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, []);
 
-  const [agentsList, setAgentsList] = useState([]);
-  const [agentSearch, setAgentSearch] = useState("");
-  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [usersCache, setUsersCache] = useState({});
+    const [pagination, setPagination] = useState({
+        total_records: 0,
+        total_pages: 0,
+        page_size: 15
+    });
+    
+    const [usersData, setUsersData] = useState([]);
+    const [search, setSearch] = useState("");
 
-  const [showForm, setShowForm] = useState(false);
-  const [originalUser, setOriginalUser] = useState(null);
+    const [expandedUserId, setExpandedUserId] = useState(null);
+    const [extraDetails, setExtraDetails] = useState([]);
+    const [extraLoading, setExtraLoading] = useState(false);
 
-  const emptyForm = {
-    user_id: null,
-    name: "",
-    email: "",
-    mobile: "",
-    branch: "",
-    branch: "",
-    address: "",
-    dob: "",
-    pincode: "",
-    express_needs: "",
-    agent_id: "",
-    is_active: true,
-  };
+    const [showForm, setShowForm] = useState(false);
+    const [originalUser, setOriginalUser] = useState(null);
+    
+    // Agent Search State
+    const [agentSearch, setAgentSearch] = useState("");
+    const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+    const [agentsList, setAgentsList] = useState([]);
 
-  const [form, setForm] = useState(emptyForm);
-  const [viewImg, setViewImg] = useState(null);
+    useEffect(() => {
+        const fetchAgents = async () => {
+             // Check session storage first to avoid repetitive API calls
+             const cachedAgents = sessionStorage.getItem("agentsList");
+             if (cachedAgents) {
+                 setAgentsList(JSON.parse(cachedAgents));
+             }
 
-  /* ================= FETCH USERS ================= */
-  const fetchUsers = async (page = 1) => {
-    // Note: API supports search? If so add &search=${search}
-    // Assuming API keys: page, total_pages
-    const res = await fetch(`${BASE_URL}/user-details?page=${page}`);
-    const data = await res.json();
-    setUsersData(data.user_details || []);
-    setTotalPages(data.total_pages || 1);
-  };
+             // We can still fetch in background to update, or just rely on cache.
+             // To strictly "minimize", we rely on cache and maybe refresh only if empty.
+             if (!cachedAgents) {
+                try {
+                    const res = await fetch(`${BASE_URL}/agents`);
+                    const data = await res.json();
+                    if(data.agents) {
+                        setAgentsList(data.agents);
+                        sessionStorage.setItem("agentsList", JSON.stringify(data.agents));
+                    }
+                } catch(e) { console.error("Failed to fetch agents", e); }
+             }
+        };
+        fetchAgents();
+    }, []);
 
-  useEffect(() => {
-    fetchUsers(currentPage);
-    fetchAgents();
-  }, [currentPage]);
+    const emptyForm = {
+        user_id: null,
+        name: "",
+        email: "",
+        mobile: "",
+        branch: "",
+        address: "",
+        is_active: true,
+        agent_id: "",
+        dob: "",
+        pincode: "",
+        express_needs: ""
+    };
+    
+    const [form, setForm] = useState(emptyForm);
+    const [viewImg, setViewImg] = useState(null);
+    const [imgLoading, setImgLoading] = useState(true);
 
-  const fetchAgents = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/agents`);
-      const data = await res.json();
-      setAgentsList(data.agents || []);
-    } catch (err) {
-      console.error("Failed to fetch agents", err);
-    }
-  };
+    useEffect(() => {
+        if (viewImg) {
+            setImgLoading(true);
+        }
+    }, [viewImg]);
 
-  /* ================= SEARCH ================= */
-  // For filteredUsers, if search is local only:
-  const filteredUsers = usersData.filter((u) =>
-    `${u.name} ${u.email} ${u.mobile} ${u.branch}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+    /* ================= FETCH USERS ================= */
+    const fetchUsers = async (page = 1) => {
+        // Check cache first
+        if (usersCache[page]) {
+            setUsersData(usersCache[page]);
+            setLoading(false);
+            return;
+        }
 
-  // Client-side slicing REMOVED since API is paginated
-  // If API search is not implemented, search only works on current page.
-  // const paginatedUsers = filteredUsers... (removed)
+        // Deduplicate requests
+        if (fetchingRef.current === page) return;
+        fetchingRef.current = page;
 
+        setLoading(true);
+        try {
+            const res = await fetch(`${BASE_URL}/user-details?page=${page}&page_size=15`);
+            const data = await res.json();
+            
+            if (data.status === "success") {
+                setUsersData(data.user_details || []);
+                setPagination({
+                    total_records: data.total_records,
+                    total_pages: data.total_pages,
+                    page_size: data.page_size
+                });
+
+                // Update cache
+                setUsersCache(prev => ({
+                    ...prev,
+                    [page]: data.user_details || []
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to fetch users", error);
+        } finally {
+            setLoading(false);
+            fetchingRef.current = null;
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers(currentPage);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage]);
+
+    // Refresh current page (bypassing cache if needed, e.g., after edit/delete)
+    const refreshCurrentPage = async () => {
+        const page = currentPage;
+        // Invalidate cache for this page to force a refresh
+        setUsersCache(prev => {
+            const newCache = { ...prev };
+            delete newCache[page];
+            return newCache;
+        });
+        // We need to call fetch explicitly after cache invalidation logic is settled 
+        // or just force fetch. For simplicity, let's just force fetch logic:
+        try {
+            const res = await fetch(`${BASE_URL}/user-details?is_active=true&page=${page}&page_size=15`);
+            const data = await res.json();
+            if (data.status === "success") {
+                setUsersData(data.user_details || []);
+                setPagination({
+                    total_records: data.total_records,
+                    total_pages: data.total_pages,
+                    page_size: data.page_size
+                });
+                setUsersCache(prev => ({
+                    ...prev,
+                    [page]: data.user_details || []
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to refresh users", error);
+        }
+    };
+
+    const filteredUsers = usersData.filter((u) =>
+        `${u.name} ${u.email} ${u.mobile} ${u.branch}`
+            .toLowerCase()
+            .includes(search.toLowerCase())
+    );
 
   /* ================= ROW CLICK ================= */
   const toggleRow = async (u) => {
@@ -115,7 +208,6 @@ export default function UserManagement() {
   };
 
   /* ================= SAVE USER ================= */
-  /* ================= SAVE USER ================= */
   const handleSave = async () => {
     const isEdit = Boolean(originalUser);
     const url = isEdit
@@ -142,11 +234,11 @@ export default function UserManagement() {
         return;
       }
 
-      await fetchUsers(currentPage);
+      await refreshCurrentPage();
       setShowForm(false);
-    } catch (err) {
-      console.error("Network Error:", err);
-      alert("Network exception occurred");
+    } catch (error) {
+      console.error("Save operation failed", error);
+      alert("An error occurred while saving user data.");
     }
   };
 
@@ -154,12 +246,17 @@ export default function UserManagement() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete user?")) return;
     await fetch(`${BASE_URL}/user-details/${id}`, { method: "DELETE" });
-    fetchUsers(currentPage);
+    refreshCurrentPage();
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow border">
+    // ...
+
+    if (loading) {
+        return <SkeletonLoader type="table" count={8} />;
+    }
+
+    return (
+        <div className="bg-white rounded-xl shadow border border-gray-200">
 
         {/* ================= ADD / EDIT MODAL ================= */}
         {showForm && (
@@ -273,297 +370,238 @@ export default function UserManagement() {
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-in fade-in duration-200"
             onClick={() => setViewImg(null)}
           >
-            <div className="relative bg-white p-2 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="relative bg-white p-2 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden min-h-[200px] flex items-center justify-center" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setViewImg(null)}
                 className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
               >
                 <FiX size={20} className="text-gray-600" />
               </button>
+              
+              {imgLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-0">
+                  <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-2"></div>
+                  <span className="text-sm text-gray-500 font-medium">Loading Image...</span>
+                </div>
+              )}
+
               <img
                 src={viewImg}
                 alt="Document Preview"
-                className="w-full h-auto max-h-[80vh] object-contain rounded-xl"
+                onLoad={() => setImgLoading(false)}
+                className={`w-full h-auto max-h-[80vh] object-contain rounded-xl transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
               />
             </div>
           </div>
         )}
 
-        {/* ================= HEADER ================= */}
-        <div className="p-4 md:p-6 flex flex-col sm:flex-row justify-between gap-4 border-b">
-          <div>
-            <h2 className="text-xl font-bold">Traveller Assessment</h2>
-            <p className="text-sm text-gray-500">
-              Manage users and traveller details
-            </p>
-          </div>
+      {/* ================= HEADER ================= */}
+      <div className="flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b border-gray-100 gap-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Traveller Assessment</h2>
 
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* <div className="relative">
-            <FiSearch className="absolute left-3 top-3 text-gray-400" />
-            <input
-              className="w-full sm:w-auto pl-10 pr-4 py-2 border rounded"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div> */}
-            <div className="relative w-full sm:w-[400px] md:w-[480px]">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                className="w-full pl-10 px-6 pr-4 py-2.5 border rounded-lg text-sm
-               focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-
-
-            <button
-              onClick={handleAddUser}
-              className="border border-blue-400 bg-blue-800 text-white rounded-lg px-2 h-[40px]"
-
-
-            >
-              + Add User
-            </button>
-
-          </div>
-        </div>
-
-        {/* ================= TABLE WRAPPER ================= */}
-        <div className="overflow-x-auto">
-          {/* ================= TABLE HEADER ================= */}
-          <div className="grid px-6 py-3 text-xs font-semibold bg-gray-50 min-w-[800px]" style={{ gridTemplateColumns: '60px 1fr 1fr 1fr 1fr 1fr 100px 100px' }}>
-            <div>S.No</div>
-            <div>Name</div>
-            <div>Email</div>
-            <div>Mobile</div>
-            <div>Branch</div>
-            <div>Agent ID</div>
-            <div>Status</div>
-            <div>Actions</div>
-          </div>
-
-          {/* ================= USERS ================= */}
-          {/* ================= USERS ================= */}
-          {filteredUsers.map((u, i) => (
-            <div key={u.user_id} className="border-b">
-
-
-              <div
-                onClick={() => toggleRow(u)}
-                className={`grid px-6 py-4 text-sm cursor-pointer min-w-[800px] transition-colors
-    ${expandedUserId === u.user_id
-                    ? "bg-blue-100 border-l-4 border-blue-500"
-                    : "bg-white hover:bg-blue-50"}
-  `} style={{ gridTemplateColumns: "60px 1fr 1fr 1fr 1fr 1fr 100px 100px", }}
-              >
-
-                <div>{(currentPage - 1) * 10 + i + 1}</div>
-                <div className="font-medium">{u.name}</div>
-                <div>{u.email}</div>
-                <div>{u.mobile}</div>
-                <div>{u.branch}</div>
-                <div className="text-gray-600">{u.agent_id || '-'}</div>
-                <div>{u.is_active ? "Active" : "Inactive"}</div>
-                <div className="flex gap-3">
-                  <FiEdit
-                    className="text-indigo-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(u);
-                    }}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-48">
+                  <FiSearch 
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-600" 
+                    size={16}
                   />
-                  <FiTrash2
-                    className="text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(u.user_id);
-                    }}
+                  <input
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
+                      placeholder="Search..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
                   />
-                </div>
               </div>
-
-              {/* ================= EXTRA DETAILS ================= */}
-              {expandedUserId === u.user_id && (
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
-                  {extraLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                      <p className="ml-3 text-gray-600">Loading traveler details...</p>
-                    </div>
-                  ) : extraDetails.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
-                      <p className="text-gray-500">No traveler details found</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {extraDetails.map((d, idx) => (
-                        <div key={d.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                          {/* Header */}
-                          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-3 flex justify-between items-center">
-                            <h4 className="text-white font-semibold text-sm">
-                              Traveler #{idx + 1}: {d.name} {d.surname}
-                            </h4>
-                            {/* <span className={`px-3 py-1 rounded-full text-xs font-medium ${d.isagreed ? 'bg-green-400 text-green-900' : 'bg-yellow-400 text-yellow-900'
-                            }`}>
-                            {d.isagreed ? '✓ Agreed' : 'Pending'}
-                          </span> */}
-                          </div>
-
-                          <div className="p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                              {/* Personal Information */}
-                              <div className="space-y-3">
-                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Personal Info</h5>
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="text-xs text-gray-500">Full Name</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.name} {d.surname}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Mobile</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.mobile || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Date of Birth</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.dob || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Gender</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.gender || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Nationality</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.nationality || 'N/A'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Passport Information */}
-                              <div className="space-y-3">
-                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Passport Details</h5>
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="text-xs text-gray-500">Passport Number</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Issued By</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.issuedby || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Date of Issue</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.dateofissued || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Date of Expiry</label>
-                                    <p className="text-sm font-medium text-gray-900">{d.dateofexpired || 'N/A'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Tour & Documents */}
-                              <div className="space-y-3">
-                                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Tour & Documents</h5>
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="text-xs text-gray-500">Tour Code</label>
-                                    <p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-500">Created At</label>
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {new Date(d.created_at).toLocaleDateString('en-IN', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Document Links */}
-                                <div className="pt-3 space-y-2">
-                                  <label className="text-xs text-gray-500 block">Documents</label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {d.passport_image_url && (
-                                      <button
-                                        onClick={() => setViewImg(d.passport_image_url)}
-                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Passport
-                                      </button>
-                                    )}
-                                    {d.aadhar_front_url && (
-                                      <button
-                                        onClick={() => setViewImg(d.aadhar_front_url)}
-                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Aadhar Front
-                                      </button>
-                                    )}
-                                    {d.aadhar_back_url && (
-                                      <button
-                                        onClick={() => setViewImg(d.aadhar_back_url)}
-                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Aadhar Back
-                                      </button>
-                                    )}
-                                    {d.pancard_url && (
-                                      <button
-                                        onClick={() => setViewImg(d.pancard_url)}
-                                        className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        PAN
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
+              <button
+                  onClick={handleAddUser}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition-all whitespace-nowrap"
+              >
+                  + Add User
+              </button>
+          </div>
       </div>
 
-      <div className="flex justify-center">
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
+      {/* ================= TABLE WRAPPER ================= */}
+      <div className="p-5 border w-[100%] overflow-scroll scrollbar-hide">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-100 border-b">
+            <tr>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">S.No</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Name</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Email</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Mobile</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Branch</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Status</th>
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredUsers.map((u, i) => (
+              <React.Fragment key={u.user_id}>
+                <tr
+                  onClick={() => toggleRow(u)}
+                  className={`cursor-pointer transition-colors text-sm
+                    ${expandedUserId === u.user_id ? "bg-blue-50" : "hover:bg-gray-50"}
+                  `}
+                >
+                  <td className="px-4 py-3 text-center">{(currentPage - 1) * pagination.page_size + i + 1}</td>
+                  <td className="px-4 py-3 text-center">{u.name}</td>
+                  <td className="px-4 py-3 text-center">{u.email}</td>
+                  <td className="px-4 py-3 text-center">{u.mobile}</td>
+                  <td className="px-4 py-3 text-center">{u.branch}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex px-2 text-xs font-semibold leading-5 text-green-800 bg-green-100 rounded-full
+                      ${!u.is_active && "text-red-800 bg-red-100"}`}>
+                      {u.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center gap-3">
+                      <FiEdit
+                        className="text-indigo-600 hover:text-indigo-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(u);
+                        }}
+                      />
+                      <FiTrash2
+                        className="text-red-500 hover:text-red-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(u.user_id);
+                        }}
+                      />
+                    </div>
+                  </td>
+                </tr>
+
+                {/* ================= EXTRA DETAILS ================= */}
+                {expandedUserId === u.user_id && (
+                  <tr>
+                    <td colSpan="7" className="p-0 border-b">
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
+                        {extraLoading ? (
+                          <SkeletonLoader type="table" count={5} />
+                        ) : extraDetails.length === 0 ? (
+                          <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                            <p className="text-gray-500">No traveler details found</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {extraDetails.map((d, idx) => (
+                              <div key={d.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-3 flex justify-between items-center">
+                                  <h4 className="text-white font-semibold text-sm">
+                                    Traveler #{idx + 1}: {d.name} {d.surname}
+                                  </h4>
+                                </div>
+                                
+                                <div className="p-6">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {/* Personal Information */}
+                                    <div className="space-y-3">
+                                      <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Personal Info</h5>
+                                      <div className="space-y-2">
+                                        <div><label className="text-xs text-gray-500">Full Name</label><p className="text-sm font-medium text-gray-900">{d.name} {d.surname}</p></div>
+                                        <div><label className="text-xs text-gray-500">Mobile</label><p className="text-sm font-medium text-gray-900">{d.mobile || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Date of Birth</label><p className="text-sm font-medium text-gray-900">{d.dob || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Gender</label><p className="text-sm font-medium text-gray-900">{d.gender || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Nationality</label><p className="text-sm font-medium text-gray-900">{d.nationality || 'N/A'}</p></div>
+                                      </div>
+                                    </div>
+                                    {/* Passport Information */}
+                                    <div className="space-y-3">
+                                      <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Passport Details</h5>
+                                      <div className="space-y-2">
+                                        <div><label className="text-xs text-gray-500">Passport Number</label><p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Issued By</label><p className="text-sm font-medium text-gray-900">{d.issuedby || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Date of Issue</label><p className="text-sm font-medium text-gray-900">{d.dateofissued || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Date of Expiry</label><p className="text-sm font-medium text-gray-900">{d.dateofexpired || 'N/A'}</p></div>
+                                      </div>
+                                    </div>
+                                    {/* Tour & Documents */}
+                                    <div className="space-y-3">
+                                      <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Tour & Documents</h5>
+                                      <div className="space-y-2">
+                                        <div><label className="text-xs text-gray-500">Tour Code</label><p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p></div>
+                                        <div><label className="text-xs text-gray-500">Created At</label><p className="text-sm font-medium text-gray-900">{new Date(d.created_at).toLocaleDateString('en-IN', {day: '2-digit', month: 'short', year: 'numeric'})}</p></div>
+                                      </div>
+                                      {/* Document Links */}
+                                      <div className="pt-3 space-y-2">
+                                        <label className="text-xs text-gray-500 block">Documents</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {d.passport_image_url && (<button onClick={() => setViewImg(d.passport_image_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Passport</button>)}
+                                          {d.aadhar_front_url && (<button onClick={() => setViewImg(d.aadhar_front_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Front</button>)}
+                                          {d.aadhar_back_url && (<button onClick={() => setViewImg(d.aadhar_back_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Back</button>)}
+                                          {d.pancard_url && (<button onClick={() => setViewImg(d.pancard_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>PAN</button>)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ================= PAGINATION CONTROLS ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t gap-4">
+        <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
+          Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
+        </div>
+        
+        <div className="flex justify-center gap-2 order-1 sm:order-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === 1 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+          >
+            Previous
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {/* <span className="text-sm text-gray-600">Page</span> */}
+            <input
+              type="number"
+              min="1"
+              max={pagination.total_pages}
+              value={currentPage}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val) && val >= 1 && val <= pagination.total_pages) {
+                  setCurrentPage(val);
+                }
+              }}
+              className="w-16 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
+            />
+            <span className="text-sm text-gray-600">of {pagination.total_pages}</span>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, pagination.total_pages))}
+            disabled={currentPage === pagination.total_pages}
+            className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === pagination.total_pages 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+          >
+            Next
+          </button>
+        </div>
+        <div className="hidden sm:block order-3"></div>
       </div>
     </div>
   );

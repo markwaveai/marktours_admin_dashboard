@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 const tourImages = {
   dubai: "/assets/tours/dubai.jpg",
@@ -42,8 +43,16 @@ function TourImage({ src, tourName, className }) {
 }
 
 export default function TourManagement() {
-  const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      const timer = setTimeout(() => {
+          setLoading(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+  }, []);
+
+  const [tours, setTours] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -250,10 +259,12 @@ export default function TourManagement() {
     setIsEdit(false);
   };
 
-  if (loading) return <div className="p-10 text-center">Loading...</div>;
+    if (loading) {
+        return <SkeletonLoader type="card" count={6} />;
+    }
 
-  return (
-    <div className="space-y-4">
+    return (
+        <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-800">Tour Management</h2>
         <button
@@ -264,7 +275,7 @@ export default function TourManagement() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
         {tours.map((tour) => (
           <div
             key={tour.id}

@@ -1,10 +1,25 @@
-import { useState } from "react";
-import usersDataRaw from "../../../data/users.json";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { Users, Calendar, ArrowRight, UserPlus } from "lucide-react";
+import { Search, Filter, Calendar, UserPlus, ArrowRight } from "lucide-react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
+
+const usersDataRaw = [
+    { id: 1, name: "Alice Johnson", email: "alice@example.com", tour: "Europe Escape", batch: "Oct 2023" },
+    { id: 2, name: "Bob Smith", email: "bob@example.com", tour: "Bali Bliss", batch: "Nov 2023" },
+    { id: 3, name: "Charlie Brown", email: "charlie@example.com", tour: "Europe Escape", batch: "Oct 2023" },
+];
 
 export default function TourAssignment() {
-    const [users, setUsers] = useState(usersDataRaw);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const [users, setUsers] = useState([]); // Initialized as empty
     const [selectedTour, setSelectedTour] = useState("All");
 
     // Initialize batches from raw data so they persist even if users are moved out
@@ -225,8 +240,12 @@ export default function TourAssignment() {
         });
     };
 
+  if (loading) {
+      return <SkeletonLoader type="dashboard" count={1} />; // Using dashboard/custom type or just return earlier
+  }
+
     return (
-        <div className="space-y-6 relative">
+        <div className="space-y-8 relative">
             {/* Move User Modal */}
             {moveUserModal.show && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

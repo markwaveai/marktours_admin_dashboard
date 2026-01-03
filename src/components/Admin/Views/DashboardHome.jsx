@@ -13,7 +13,17 @@ import {
   Area,
 } from "recharts";
 
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react"; // Ensure React, useState, useEffect are imported
+import {
+  Users,
+  CreditCard,
+  AlertTriangle,
+  TrendingUp,
+  Briefcase,
+  ArrowUpRight,
+  ArrowDownRight
+} from "lucide-react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -39,7 +49,7 @@ export default function DashboardHome() {
   /* ------------------ STATE ------------------ */
   const [usersData, setUsersData] = useState([]);
   const [agentsData, setAgentsData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   /* ------------------ EMI STATIC DATA ------------------ */
   const emiProjectionData = [
@@ -50,42 +60,6 @@ export default function DashboardHome() {
     { month: "May", collected: 1890, projected: 4800 },
     { month: "Jun", collected: 2390, projected: 3800 },
   ];
-
-  /* ------------------ FETCH DATA ------------------ */
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const usersRes = await fetch(
-          "https://marktours-services-jn6cma3vvq-el.a.run.app/user-details"
-        );
-        const agentsRes = await fetch(
-          "https://marktours-services-jn6cma3vvq-el.a.run.app/agents"
-        );
-
-        const usersJson = await usersRes.json();
-        const agentsJson = await agentsRes.json();
-
-        const usersArray = Array.isArray(usersJson?.user_details)
-          ? usersJson.user_details
-          : [];
-
-        const agentsArray = Array.isArray(agentsJson?.agents)
-          ? agentsJson.agents
-          : [];
-
-        setUsersData(usersArray);
-        setAgentsData(agentsArray);
-      } catch (error) {
-        console.error("Dashboard API error:", error);
-        setUsersData([]);
-        setAgentsData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
 
   /* ------------------ STATS ------------------ */
   const totalUsers = usersData.length;

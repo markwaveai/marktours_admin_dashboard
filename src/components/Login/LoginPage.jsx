@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
-export default function LoginPage() {
+
+export default function LoginPage({setShowLogin}) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -10,7 +10,7 @@ export default function LoginPage() {
     const handleLogin = (e) => {
         e.preventDefault();
         if (email === "admin" && password === "mark@2025") {
-            navigate("/admin-dashboard");
+            setShowLogin(false);
         } else {
             setError("Invalid credentials. Please try again.");
         }

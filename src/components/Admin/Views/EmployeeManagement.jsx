@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import {
     FiEdit,
     FiTrash2,
     FiSearch,
-    FiChevronDown,
-    FiChevronUp,
 } from "react-icons/fi";
 import Pagination from "../Pagination";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 const API_BASE = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 
@@ -16,11 +15,18 @@ export default function EmployeeManagement() {
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [search, setSearch] = useState("");
+    
+    // Pagination & Cache State
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-
+    const [agentsCache, setAgentsCache] = useState({});
+    const [pagination, setPagination] = useState({
+        total_records: 0,
+        total_pages: 1,
+        page_size: 15
+    });
 
     const [loading, setLoading] = useState(false);
+    const fetchingRef = useRef(null);
 
     const emptyForm = {
         id: null,
@@ -43,13 +49,60 @@ export default function EmployeeManagement() {
     const roles = ["Admin", "Employee", "Agent", "User"];
     const [form, setForm] = useState(emptyForm);
 
+    /* ================= EXPANSION STATE ================= */
+    const [expandedAgentId, setExpandedAgentId] = useState(null);
+    const [referredUsers, setReferredUsers] = useState([]);
+    const [referredLoading, setReferredLoading] = useState(false);
+
+    const toggleRow = async (agentId) => {
+        if (expandedAgentId === agentId) {
+            setExpandedAgentId(null);
+            setReferredUsers([]);
+            return;
+        }
+
+        setExpandedAgentId(agentId);
+        setReferredLoading(true);
+        setReferredUsers([]);
+
+        try {
+            const res = await fetch(`${API_BASE}/agents/all/details?agent_id=${agentId}&page=1&size=15`);
+            const data = await res.json();
+            // API returns paginated structure? User said: ...?agent_id=10155&page=1&size=15
+            // Assuming response has 'users' or 'data'. 
+            // Let's assume standard response structure or check what comes back. 
+            // User didn't specify response structure, but usually it's `data.user_details` or similar.
+            // I'll log it and try to map safely.
+            const users = data.user_details || data.users || data.data || []; 
+            setReferredUsers(users);
+        } catch (error) {
+            console.error("Failed to fetch referred users", error);
+        } finally {
+            setReferredLoading(false);
+        }
+    };
+
     /* ================= GET ALL AGENTS ================= */
     const fetchAgents = async (page = 1) => {
+        // Check cache first
+        if (agentsCache[page]) {
+            setEmployeesData(agentsCache[page]);
+            // We assume pagination metadata doesn't change wildly between cached pages, 
+            // but for strict correctness we might want to store metadata in cache too.
+            // For now, we'll just use the cached data.
+            return;
+        }
+
+        // Deduplicate requests
+        if (fetchingRef.current === page) return;
+        fetchingRef.current = page;
+
         try {
-            const res = await fetch(`${API_BASE}/agents?page=${page}`);
+            setLoading(true);
+            const res = await fetch(`${API_BASE}/agents?page=${page}&page_size=15`);
             const json = await res.json();
 
-            const apiAgents = json.agents.map((a) => ({
+            const apiAgents = (json.agents || []).map((a) => ({
                 id: a.agent_id,
                 name: a.name,
                 email: a.email,
@@ -59,15 +112,63 @@ export default function EmployeeManagement() {
             }));
 
             setEmployeesData(apiAgents);
-            setTotalPages(json.total_pages || 1);
+            setPagination({
+                total_records: json.total_records || 0,
+                total_pages: json.total_pages || 1,
+                page_size: json.page_size || 15
+            });
+
+            // Update cache
+            setAgentsCache(prev => ({
+                ...prev,
+                [page]: apiAgents
+            }));
+
         } catch (err) {
             console.error("Failed to fetch agents", err);
+        } finally {
+            setLoading(false);
+            fetchingRef.current = null;
         }
     };
 
     useEffect(() => {
         fetchAgents(currentPage);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPage]);
+
+    // Refresh current page (invalidate cache)
+    const refreshCurrentPage = async () => {
+        const page = currentPage;
+        setAgentsCache(prev => {
+            const newCache = { ...prev };
+            delete newCache[page];
+            return newCache;
+        });
+        // Force fetch since cache for this page is now gone (but we need to wait for state update in theory, 
+        // effectively we can just call fetch ignoring cache or clear cache then fetch)
+        // A simpler way: explicitly fetch and update cache
+        try {
+            setLoading(true);
+            const res = await fetch(`${API_BASE}/agents?page=${page}&page_size=15`);
+            const json = await res.json();
+             const apiAgents = (json.agents || []).map((a) => ({
+                id: a.agent_id,
+                name: a.name,
+                email: a.email,
+                phone: a.mobile,
+                branch: a.branch,
+                role: "Agent",
+            }));
+            setEmployeesData(apiAgents);
+             setPagination({
+                total_records: json.total_records || 0,
+                total_pages: json.total_pages || 1,
+                page_size: json.page_size || 15
+            });
+            setAgentsCache(prev => ({ ...prev, [page]: apiAgents }));
+        } catch(e) { console.error(e); } finally { setLoading(false); }
+    };
 
     /* ================= ADD ================= */
     const handleAdd = () => {
@@ -160,7 +261,9 @@ export default function EmployeeManagement() {
 
                 if (!res.ok) throw new Error("Save failed");
 
-                await fetchAgents(currentPage);
+                if (!res.ok) throw new Error("Save failed");
+
+                await refreshCurrentPage();
                 setShowForm(false);
                 setForm(emptyForm);
             } catch (err) {
@@ -190,7 +293,7 @@ export default function EmployeeManagement() {
 
         try {
             await fetch(`${API_BASE}/agents/${id}`, { method: "DELETE" });
-            await fetchAgents(currentPage);
+            await refreshCurrentPage();
         } catch {
             alert("Delete failed");
         }
@@ -210,28 +313,27 @@ export default function EmployeeManagement() {
 
 
     /* ================= UI (UNCHANGED) ================= */
-    return (
-        <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* HEADER */}
-                <div className="p-6 py-3 flex justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">
-                            Employee Management
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                            Manage employee records & roles
-                        </p>
-                    </div>
+    if (loading) {
+        return <SkeletonLoader type="table" count={8} />;
+    }
 
-                    <div className="flex gap-3 items-center">
-                        <div className="relative">
+    return (
+        <div className="bg-white rounded-xl shadow border border-gray-200">
+            <div className="rounded-2xl overflow-hidden">
+                {/* HEADER */}
+                <div className="p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                        Employee Management
+                    </h2>
+
+                    <div className="flex gap-3 items-center w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
                             <FiSearch
                                 className="absolute left-3 top-2.5 text-indigo-600"
                                 size={16}
                             />
                             <input
-                                className="pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none"
+                                className="w-full sm:w-64 pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
                                 placeholder="Search..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -240,7 +342,7 @@ export default function EmployeeManagement() {
 
                         <button
                             onClick={handleAdd}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow whitespace-nowrap"
                         >
                             + Add Member
                         </button>
@@ -273,29 +375,94 @@ export default function EmployeeManagement() {
                         </thead>
                         <tbody>
                             {filteredEmployees.map((e, i) => (
-                                <tr key={e.id} className="border-b hover:bg-gray-50">
-                                    <td className="px-4 py-3 text-center">{(currentPage - 1) * 10 + i + 1}</td>
-                                    <td className="px-4 py-3 text-center text-gray-600 font-mono text-xs">{e.id}</td>
-                                    <td className="px-4 py-3 text-center">{e.name}</td>
-                                    <td className="px-4 py-3 text-center">{e.email}</td>
-                                    <td className="px-4 py-3 text-center">{e.phone}</td>
-                                    <td className="px-4 py-3 text-center">{e.branch}</td>
-                                    <td className="px-4 py-3 text-center">{e.role}</td>
-                                    <td className="px-4 py-3 flex justify-center gap-2">
-                                        <button
-                                            onClick={() => handleEdit(e)}
-                                            className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
-                                        >
-                                            <FiEdit />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(e.id)}
-                                            className="p-2 rounded-lg bg-red-50 text-red-600"
-                                        >
-                                            <FiTrash2 />
-                                        </button>
-                                    </td>
-                                </tr>
+                                <React.Fragment key={e.id}>
+                                    <tr 
+                                        onClick={() => toggleRow(e.id)}
+                                        className={`border-b cursor-pointer transition-colors ${expandedAgentId === e.id ? "bg-indigo-50" : "hover:bg-gray-50"}`}
+                                    >
+                                        <td className="px-4 py-3 text-center">{(currentPage - 1) * 10 + i + 1}</td>
+                                        <td className="px-4 py-3 text-center text-gray-600 font-mono text-xs">{e.id}</td>
+                                        <td className="px-4 py-3 text-center">{e.name}</td>
+                                        <td className="px-4 py-3 text-center">{e.email}</td>
+                                        <td className="px-4 py-3 text-center">{e.phone}</td>
+                                        <td className="px-4 py-3 text-center">{e.branch}</td>
+                                        <td className="px-4 py-3 text-center">{e.role}</td>
+                                        <td className="px-4 py-3 flex justify-center gap-2">
+                                            <button
+                                                onClick={(ev) => {
+                                                    ev.stopPropagation();
+                                                    handleEdit(e);
+                                                }}
+                                                className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
+                                            >
+                                                <FiEdit />
+                                            </button>
+                                            <button
+                                                onClick={(ev) => {
+                                                    ev.stopPropagation();
+                                                    handleDelete(e.id);
+                                                }}
+                                                className="p-2 rounded-lg bg-red-50 text-red-600"
+                                            >
+                                                <FiTrash2 />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {/* EXPANDED ROW */}
+                                    {expandedAgentId === e.id && (
+                                        <tr>
+                                            <td colSpan={8} className="p-4 bg-gray-50 border-b shadow-inner">
+                                                <div className="bg-white rounded-lg border shadow-sm p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    <h4 className="text-sm font-bold text-gray-700 mb-3 border-b pb-2">
+                                                        Users Referred by Agent {e.id}
+                                                    </h4>
+
+                                                    {referredLoading ? (
+                                                        <div className="py-4 text-center text-gray-500">
+                                                            <div className="inline-block w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                                                            <p className="text-xs">Loading referred users...</p>
+                                                        </div>
+                                                    ) : referredUsers.length > 0 ? (
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-xs text-left">
+                                                                <thead className="bg-gray-100 text-gray-600 uppercase">
+                                                                    <tr>
+                                                                        <th className="px-3 py-2">Name</th>
+                                                                        <th className="px-3 py-2">Email</th>
+                                                                        <th className="px-3 py-2">Phone</th>
+                                                                        <th className="px-3 py-2">Joined</th>
+                                                                        <th className="px-3 py-2">Status</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y">
+                                                                    {referredUsers.map((u, idx) => (
+                                                                        <tr key={idx} className="hover:bg-gray-50">
+                                                                            <td className="px-3 py-2 font-medium">{u.name}</td>
+                                                                            <td className="px-3 py-2 text-gray-500">{u.email}</td>
+                                                                            <td className="px-3 py-2 text-gray-500">{u.mobile}</td>
+                                                                            <td className="px-3 py-2 text-gray-500">
+                                                                                {new Date(u.created_at || Date.now()).toLocaleDateString("en-IN")}
+                                                                            </td>
+                                                                            <td className="px-3 py-2">
+                                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                                    {u.is_active ? 'Active' : 'Inactive'}
+                                                                                </span>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center py-4 text-gray-400 text-sm">
+                                                            No users referred by this agent.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -417,12 +584,54 @@ export default function EmployeeManagement() {
                 )}
             </div>
 
-            <div className="flex justify-center">
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                />
+            {/* ================= PAGINATION CONTROLS ================= */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t gap-4">
+                <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
+                    Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
+                </div>
+
+                <div className="flex justify-center gap-2 order-1 sm:order-2">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === 1
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+                    >
+                        Previous
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                        {/* <span className="text-sm text-gray-600">Page</span> */}
+                        <input
+                            type="number"
+                            min="1"
+                            max={pagination.total_pages}
+                            value={currentPage}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val) && val >= 1 && val <= pagination.total_pages) {
+                                    setCurrentPage(val);
+                                }
+                            }}
+                            className="w-16 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
+                        />
+                        <span className="text-sm text-gray-600">of {pagination.total_pages}</span>
+                    </div>
+
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, pagination.total_pages))}
+                        disabled={currentPage === pagination.total_pages}
+                        className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === pagination.total_pages
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+                    >
+                        Next
+                    </button>
+                </div>
+                <div className="hidden sm:block order-3"></div>
             </div>
         </div >
     );

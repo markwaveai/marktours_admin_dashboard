@@ -1,7 +1,22 @@
-import usersData from "../../../data/users.json";
+import { useState, useEffect } from "react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
+// Removed users.json import
 
 export default function CompanyPaid() {
-    const eligibleForBenefit = usersData.filter(u => u.status === "Active" && u.riskLevel === "Low");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const eligibleForBenefit = [].filter((u) => u.status === "Active" && u.riskLevel === "Low");
+
+  if (loading) {
+      return <SkeletonLoader type="table" count={8} />;
+  }
 
     return (
         <div className="space-y-6">

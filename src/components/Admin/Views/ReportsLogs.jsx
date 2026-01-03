@@ -4,8 +4,19 @@ import {
   faChartSimple,   // 📊
   faNoteSticky,    // 📝
 } from "@fortawesome/free-solid-svg-icons";
+import { useState, useEffect } from "react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 export default function ReportsLogs() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const reports = [
     { id: 1, name: "Monthly Financial Report - Nov 2023", date: "2023-12-01", type: "PDF", size: "2.4 MB" },
     { id: 2, name: "User Acquisition Audit", date: "2023-11-28", type: "CSV", size: "1.1 MB" },
@@ -19,6 +30,10 @@ export default function ReportsLogs() {
     if (type === "TXT") return faNoteSticky; // 📝
     return faFileLines; // 📄
   };
+
+  if (loading) {
+    return <SkeletonLoader type="table" count={8} />;
+  }
 
   return (
     <div className="space-y-6">

@@ -1,15 +1,32 @@
-import { useState } from "react";
-import usersData from "../../../data/users.json";
+import { useState, useEffect } from "react";
+
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 export default function EligibilityEngine() {
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const [users] = useState([]);
     const [filterCriteria, setFilterCriteria] = useState("all");
 
-    const eligibleUsers = usersData.filter(u =>
+    // Note: usersData is no longer imported, so this filter will operate on an empty array initially.
+    // You will need to populate the 'users' state with data, e.g., from an API call.
+    const eligibleUsers = users.filter(u =>
         filterCriteria === "all" ? true :
             filterCriteria === "eligible" ? u.eligibility === "Eligible" :
                 filterCriteria === "review" ? u.eligibility === "Review Needed" :
                     u.eligibility === "Ineligible"
     );
+
+    if (loading) {
+        return <SkeletonLoader type="table" count={8} />;
+    }
 
     return (
         <div className="space-y-6">
@@ -21,15 +38,15 @@ export default function EligibilityEngine() {
                 <div className="mt-6 flex gap-4">
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 flex-1">
                         <p className="text-sm font-medium opacity-80">Total Scanned</p>
-                        <p className="text-3xl font-bold mt-1">{usersData.length}</p>
+                        <p className="text-3xl font-bold mt-1">{users.length}</p>
                     </div>
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 flex-1">
                         <p className="text-sm font-medium opacity-80">Eligible Users</p>
-                        <p className="text-3xl font-bold mt-1">{usersData.filter(u => u.eligibility === "Eligible").length}</p>
+                        <p className="text-3xl font-bold mt-1">{users.filter(u => u.eligibility === "Eligible").length}</p>
                     </div>
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 flex-1">
                         <p className="text-sm font-medium opacity-80">Review Needed</p>
-                        <p className="text-3xl font-bold mt-1">{usersData.filter(u => u.eligibility === "Review Needed").length}</p>
+                        <p className="text-3xl font-bold mt-1">{users.filter(u => u.eligibility === "Review Needed").length}</p>
                     </div>
                 </div>
             </div>

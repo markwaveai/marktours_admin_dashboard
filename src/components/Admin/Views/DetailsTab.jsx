@@ -30,7 +30,7 @@ export default function DetailsTab() {
             </div>
 
             {/* Tab Content */}
-            <div className="mt-4">
+            <div className="">
                 {activeSubTab === "User Management" && <UserManagement />}
                 {activeSubTab === "Employee Management" && <EmployeeManagement />}
             </div>

@@ -6,20 +6,20 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import usersData from "../../../data/users.json";
+import { useState, useEffect } from "react";
+import SkeletonLoader from "../../Common/SkeletonLoader";
 
 export default function EMIPayments() {
-  /* ================= OVERDUE CALCULATION ================= */
-  const overdueUsers = usersData.filter(
-    (u) => u.status === "Late" || u.status === "Defaulted"
-  );
+  const [loading, setLoading] = useState(true);
 
-  const totalOverdue = overdueUsers
-    .reduce((acc, user) => {
-      const amount = parseInt(user.emiAmount?.replace(/[^0-9]/g, "")) || 0;
-      return acc + amount;
-    }, 0)
-    .toLocaleString("en-IN", { style: "currency", currency: "INR" });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const totalOverdue = "₹45,000";
 
   /* ================= PAYMENT HISTORY ================= */
   const paymentHistory = [
@@ -38,6 +38,12 @@ export default function EMIPayments() {
   const chartData = paymentHistory.filter(
     (item) => item.date >= "2023-12-01" && item.date <= "2023-12-07"
   );
+
+  // ...
+
+  if (loading) {
+      return <SkeletonLoader type="table" count={8} />;
+  }
 
   return (
     <div className="space-y-6">
