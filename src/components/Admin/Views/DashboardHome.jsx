@@ -13,7 +13,7 @@ import {
   Area,
 } from "recharts";
 
-import React, { useState, useEffect } from "react"; // Ensure React, useState, useEffect are imported
+import React, { useState, useEffect, useRef } from "react"; // Ensure React, useState, useEffect are imported
 import {
   Users,
   CreditCard,
@@ -50,6 +50,46 @@ export default function DashboardHome() {
   const [usersData, setUsersData] = useState([]);
   const [agentsData, setAgentsData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const fetchingRef = useRef(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+
+      try {
+        setLoading(true);
+        // Fetch Users (Page 1) to get total count
+        const userRes = await fetch("https://marktours-services-jn6cma3vvq-el.a.run.app/user-details?page=1&page_size=1");
+        const userData = await userRes.json();
+
+         setTotalRecords(userData.total_records);
+        if (userData.user_details) setUsersData(userData.user_details);
+        // Use total_records for "Total Users"
+        if (userData.pagination && userData.pagination.total_records) {
+           
+        }
+
+        // We could also fetch agents here if needed, but currently unused
+        // const agentRes = await fetch(...)
+      } catch (error) {
+        console.error("Dashboard fetch error:", error);
+      } finally {
+        setLoading(false);
+        // fetchingRef.current = false; // Intentionally kept true if we only want one fetch on mount
+        // But for development/StrictMode it might help to reset if we really want to allow re-fetch
+        // For 'once on mount' behavior, leaving it true (or cleaning up) is key.
+        // Actually, if we never want to re-run this effect, we don't need to reset it to false
+        // unless we have specific re-fetch logic. 
+        // Given the goal is to stop double-fetch on mount, we can leave it or reset it only on unmount?
+        // Let's safe-guard:
+        fetchingRef.current = false; 
+      }
+    };
+
+    fetchData();
+  }, []);
 
   /* ------------------ EMI STATIC DATA ------------------ */
   const emiProjectionData = [
@@ -62,7 +102,8 @@ export default function DashboardHome() {
   ];
 
   /* ------------------ STATS ------------------ */
-  const totalUsers = usersData.length;
+  // const totalUsers = usersData.length;
+  
   const activeUsers = usersData.filter(isUserActive).length;
   const totalEmployees = agentsData.length;
 
@@ -113,9 +154,9 @@ export default function DashboardHome() {
   return (
     <div className="space-y-6">
       {/* ------------------ STAT CARDS ------------------ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-        <Widget title="Total Users" value={totalUsers} change="+12%" icon={faUsers} badge="bg-blue-600" />
-        <Widget title="Active Users" value={activeUsers} change="+5%" icon={faUserCheck} badge="bg-green-600" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mt-5">
+        <Widget title="Total Users" value={totalRecords} change="+12%" icon={faUsers} badge="bg-blue-600" />
+        <Widget title="Active Users" value={totalRecords} change="+5%" icon={faUserCheck} badge="bg-green-600" />
         <Widget title="Employee Management" value={totalEmployees} change="+2" icon={faBriefcase} badge="bg-black" />
         <Widget title="Projected Month EMI" value={totalPendingEMI} change="-2%" icon={faCreditCard} badge="bg-orange-500" />
         <Widget title="Critical Risk" value={criticalRisk} change="0%" icon={faTriangleExclamation} badge="bg-red-600" />

@@ -79,8 +79,8 @@ export default function CustomerInterested() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b bg-gradient-to-r from-gray-50 to-white gap-4">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm relative">
+        <div className="sticky top-0 z-30 bg-white flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b bg-gradient-to-r from-gray-50 to-white gap-4">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">Interested Candidates</h2>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">

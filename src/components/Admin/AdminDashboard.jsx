@@ -31,7 +31,13 @@ import CustomerInterested from "./Views/CustomerInterested";
 import DetailsTab from "./Views/DetailsTab";
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("adminActiveTab") || "Dashboard";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("adminActiveTab", activeTab);
+  }, [activeTab]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
 
@@ -192,7 +198,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="flex justify-center pt-5 overflow-scroll scrollbar-hide mt-16">
+        <main className="flex justify-center pt-1 overflow-scroll scrollbar-hide mt-16">
           <div className="w-[95vw] overflow-scroll scrollbar-hide">
             {ActiveComponent}
           </div>

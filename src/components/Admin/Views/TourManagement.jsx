@@ -55,6 +55,7 @@ export default function TourManagement() {
   const [tours, setTours] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
 
   const [formData, setFormData] = useState({
     id: null,
@@ -145,7 +146,7 @@ export default function TourManagement() {
       tour_image_url: formData.tour_image_url,
     };
 
-    console.log("Tour Management Payload:", payload);
+    // console.log("Tour Management Payload:", payload);
 
     fetch(url, {
       method: method,
@@ -259,24 +260,47 @@ export default function TourManagement() {
     setIsEdit(false);
   };
 
+    const filteredTours = tours.filter((t) =>
+        `${t.tour_name} ${t.tour_code}`.toLowerCase().includes(search.toLowerCase())
+    );
+
     if (loading) {
         return <SkeletonLoader type="card" count={6} />;
     }
 
     return (
-        <div className="space-y-6">
-      <div className="flex justify-between items-center">
+        <div className="space-y-6 mb-5">
+      <div className="sticky top-0 z-30 bg-gray-50 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 className="text-lg font-bold text-gray-800">Tour Management</h2>
-        <button
-          onClick={handleCreateClick}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-indigo-700"
-        >
-          Create New Tour
-        </button>
+        
+        <div className="flex gap-3 w-full sm:w-auto">
+             <div className="relative flex-1 sm:w-64">
+                <input 
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white border border-gray-200 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                    placeholder="Search tours..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+                 <svg 
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            <button
+            onClick={handleCreateClick}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-indigo-700 whitespace-nowrap shadow-sm"
+            >
+            + Create Tour
+            </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-        {tours.map((tour) => (
+        {filteredTours.map((tour) => (
           <div
             key={tour.id}
             className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 flex flex-col"

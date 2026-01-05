@@ -6,7 +6,7 @@ export default function DetailsTab() {
     const [activeSubTab, setActiveSubTab] = useState("User Management");
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 mt-5">
             {/* Sub-tab Navigation */}
             <div className="flex space-x-4 border-b">
                 <button
@@ -30,7 +30,7 @@ export default function DetailsTab() {
             </div>
 
             {/* Tab Content */}
-            <div className="">
+            <div className="sticky top-3">
                 {activeSubTab === "User Management" && <UserManagement />}
                 {activeSubTab === "Employee Management" && <EmployeeManagement />}
             </div>

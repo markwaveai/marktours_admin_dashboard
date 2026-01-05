@@ -319,9 +319,9 @@ export default function EmployeeManagement() {
 
     return (
         <div className="bg-white rounded-xl shadow border border-gray-200">
-            <div className="rounded-2xl overflow-hidden">
+            <div className="rounded-2xl">
                 {/* HEADER */}
-                <div className="p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
+                <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                         Employee Management
                     </h2>

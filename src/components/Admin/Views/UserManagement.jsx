@@ -396,7 +396,7 @@ export default function UserManagement() {
         )}
 
       {/* ================= HEADER ================= */}
-      <div className="flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b border-gray-100 gap-4">
+      <div className="sticky top-0 z-30 bg-white flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b border-gray-100 gap-4">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">Traveller Assessment</h2>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
