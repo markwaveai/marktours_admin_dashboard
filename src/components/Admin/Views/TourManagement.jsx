@@ -241,20 +241,21 @@ export default function TourManagement() {
       id: null,
       tour_name: "",
       tour_code: "",
-      start_date: "",
-      end_date: "",
       slots: "",
       tour_description: "",
       package_price: "",
+      emi_per_month: "",
       available_slots: "",
       booked_slots: "",
+      start_date: "",
+      end_date: "",
       arrival_at: "",
       depature_at: "",
       arrivals_place: "",
       depature_place: "",
       days_count: "",
       nights_count: "",
-      emi_per_month: "",
+      
       tour_image_url: "",
     });
     setIsEdit(false);
@@ -401,7 +402,18 @@ export default function TourManagement() {
                     required
                   />
                 </div>
-
+              <div>
+                  <label className="text-xs font-semibold text-gray-500">EMI Per Month (₹)</label>
+                  <input
+                    type="number"
+                    name="emi_per_month"
+                    placeholder="EMI"
+                    value={formData.emi_per_month}
+                    onChange={handleChange}
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+                
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Start Date</label>
                   <input
@@ -470,30 +482,9 @@ export default function TourManagement() {
                   />
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-gray-500">Total Slots</label>
-                  <input
-                    type="number"
-                    name="slots"
-                    placeholder="Total Slots"
-                    value={formData.slots}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                    required
-                  />
-                </div>
+                
 
-                <div>
-                  <label className="text-xs font-semibold text-gray-500">EMI Per Month (₹)</label>
-                  <input
-                    type="number"
-                    name="emi_per_month"
-                    placeholder="EMI"
-                    value={formData.emi_per_month}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                  />
-                </div>
+              
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Days Count</label>
@@ -516,6 +507,18 @@ export default function TourManagement() {
                     value={formData.nights_count}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Total Slots</label>
+                  <input
+                    type="number"
+                    name="slots"
+                    placeholder="Total Slots"
+                    value={formData.slots}
+                    onChange={handleChange}
+                    className="w-full border rounded-lg p-2 text-sm"
+                    required
                   />
                 </div>
 

@@ -46,9 +46,9 @@ export default function AdminDashboard() {
       // Only for mobile/tablet where sidebar is fixed/overlay
       // Tailwind md is 768px.
       if (window.innerWidth >= 768) return;
-      
+
       if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
-         setIsSidebarOpen(false);
+        setIsSidebarOpen(false);
       }
     };
 
@@ -92,9 +92,9 @@ export default function AdminDashboard() {
         ref={sidebarRef}
         className={`bg-white border-r border-gray-200 flex-col shadow-lg duration-500 ease-in-out 
         ${isSidebarOpen
-          ? "w-64 translate-x-0 mr-4"
-          : "w-64 -translate-x-full md:w-0 md:translate-x-0 overflow-hidden"}
-        fixed md:relative z-50 flex h-full`}
+            ? "w-64 translate-x-0 mr-4"
+            : "w-64 -translate-x-full md:w-0 md:translate-x-0 overflow-hidden"}
+        fixed md:relative z-[70] flex h-full`}
       >
         {/* HEADER */}
         <div className="h-20 flex items-center gap-3 px-4 border-b">
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 rounded-lg hover:bg-gray-100"
           >
-            {isSidebarOpen ? <X /> :''}
+            {isSidebarOpen ? <X /> : ''}
           </button>
 
           <img
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
       <div className="flex-1 flex flex-col">
 
         {/* TOP HEADER */}
-        <header className="h-16 w-full bg-white border-b flex items-center justify-between px-6 fixed top-0 z-20 py-5">
+        <header className="h-16 w-full bg-white border-b flex items-center justify-between px-6 fixed top-0 z-[60] py-5">
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button
