@@ -10,12 +10,16 @@ import SkeletonLoader from "../../Common/SkeletonLoader";
 
 const API_BASE = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 
-export default function EmployeeManagement() {
+export default function EmployeeManagement({ setIsModalOpen }) {
     const [employeesData, setEmployeesData] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [search, setSearch] = useState("");
-    
+
+    useEffect(() => {
+        if (setIsModalOpen) setIsModalOpen(showForm);
+    }, [showForm, setIsModalOpen]);
+
     // Pagination & Cache State
     const [currentPage, setCurrentPage] = useState(1);
     const [agentsCache, setAgentsCache] = useState({});
@@ -35,7 +39,7 @@ export default function EmployeeManagement() {
         email: "",
         phone: "",
         branch: "",
-        role: "Employee",
+        role: "",
     };
 
     const branches = [
@@ -46,7 +50,7 @@ export default function EmployeeManagement() {
         "Hyderabad Branch",
     ];
 
-    const roles = ["Admin", "Employee", "Agent", "User"];
+    const roles = ["Admin", "Agent"];
     const [form, setForm] = useState(emptyForm);
 
     /* ================= EXPANSION STATE ================= */
@@ -73,7 +77,7 @@ export default function EmployeeManagement() {
             // Let's assume standard response structure or check what comes back. 
             // User didn't specify response structure, but usually it's `data.user_details` or similar.
             // I'll log it and try to map safely.
-            const users = data.user_details || data.users || data.data || []; 
+            const users = data.user_details || data.users || data.data || [];
             setReferredUsers(users);
         } catch (error) {
             console.error("Failed to fetch referred users", error);
@@ -152,7 +156,7 @@ export default function EmployeeManagement() {
             setLoading(true);
             const res = await fetch(`${API_BASE}/agents?page=${page}&page_size=15`);
             const json = await res.json();
-             const apiAgents = (json.agents || []).map((a) => ({
+            const apiAgents = (json.agents || []).map((a) => ({
                 id: a.agent_id,
                 name: a.name,
                 email: a.email,
@@ -161,13 +165,13 @@ export default function EmployeeManagement() {
                 role: "Agent",
             }));
             setEmployeesData(apiAgents);
-             setPagination({
+            setPagination({
                 total_records: json.total_records || 0,
                 total_pages: json.total_pages || 1,
                 page_size: json.page_size || 15
             });
             setAgentsCache(prev => ({ ...prev, [page]: apiAgents }));
-        } catch(e) { console.error(e); } finally { setLoading(false); }
+        } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
     /* ================= ADD ================= */
@@ -350,7 +354,7 @@ export default function EmployeeManagement() {
                 </div>
 
                 {/* TABLE */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto scrollbar-hide">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-100 border-b">
                             <tr>
@@ -376,16 +380,16 @@ export default function EmployeeManagement() {
                         <tbody>
                             {filteredEmployees.map((e, i) => (
                                 <React.Fragment key={e.id}>
-                                    <tr 
+                                    <tr
                                         onClick={() => toggleRow(e.id)}
                                         className={`border-b cursor-pointer transition-colors ${expandedAgentId === e.id ? "bg-indigo-50" : "hover:bg-gray-50"}`}
                                     >
                                         <td className="px-4 py-3 text-center">{(currentPage - 1) * 10 + i + 1}</td>
-                                        <td className="px-4 py-3 text-center text-gray-600 font-mono text-xs">{e.id}</td>
-                                        <td className="px-4 py-3 text-center">{e.name}</td>
-                                        <td className="px-4 py-3 text-center">{e.email}</td>
-                                        <td className="px-4 py-3 text-center">{e.phone}</td>
-                                        <td className="px-4 py-3 text-center">{e.branch}</td>
+                                        <td className="px-4 py-3 text-center text-gray-600 font-mono text-xs overflow-hidden text-ellipsis whitespace-nowrap">{e.id}</td>
+                                        <td className="px-4 py-3 text-center whitespace-nowrap font-medium">{e.name}</td>
+                                        <td className="px-4 py-3 text-center whitespace-nowrap">{e.email}</td>
+                                        <td className="px-4 py-3 text-center whitespace-nowrap">{e.phone}</td>
+                                        <td className="px-4 py-3 text-center whitespace-nowrap">{e.branch}</td>
                                         <td className="px-4 py-3 text-center">{e.role}</td>
                                         <td className="px-4 py-3 flex justify-center gap-2">
                                             <button
@@ -471,112 +475,144 @@ export default function EmployeeManagement() {
                 {/* MODAL */}
                 {showForm && (
                     <div
-                        className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+                        className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
                         onClick={() => setShowForm(false)}
                     >
                         <div
                             onClick={(e) => e.stopPropagation()}
-                            className="bg-white w-full max-w-xl rounded-xl shadow-xl"
+                            className="bg-white w-full max-w-xl rounded-xl shadow-xl overflow-hidden"
                         >
-                            <div className="px-5 py-4 border-b flex justify-between">
-                                <h3 className="text-lg font-bold">
-                                    {isEdit ? "Edit Employee" : "Add Employee"}
+                            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                                <h3 className="text-lg font-bold text-gray-800">
+                                    {isEdit ? "Edit Member" : "Add Member"}
                                 </h3>
-                                <button onClick={() => setShowForm(false)}>✕</button>
-                            </div>
-
-                            <div className="px-5 py-4 space-y-4">
-                                <input
-                                    placeholder="First Name"
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.firstName}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            firstName: e.target.value,
-                                        })
-                                    }
-                                />
-                                <input
-                                    placeholder="Last Name"
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.lastName}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            lastName: e.target.value,
-                                        })
-                                    }
-                                />
-                                <input
-                                    placeholder="Email"
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.email}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            email: e.target.value,
-                                        })
-                                    }
-                                />
-                                <input
-                                    placeholder="Mobile Number"
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.phone}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            phone: e.target.value,
-                                        })
-                                    }
-                                />
-                                <select
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.branch}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            branch: e.target.value,
-                                        })
-                                    }
-                                >
-                                    <option value="">Select Branch</option>
-                                    {branches.map((b) => (
-                                        <option key={b}>{b}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    className="border rounded-lg px-3 py-2 w-full"
-                                    value={form.role}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            role: e.target.value,
-                                        })
-                                    }
-                                >
-                                    {roles.map((r) => (
-                                        <option key={r}>{r}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="px-5 py-4 border-t flex justify-end gap-3">
                                 <button
                                     onClick={() => setShowForm(false)}
-                                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                                    className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                                >
+                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+
+                            <div className="px-6 py-6 space-y-5 max-h-[65vh] overflow-y-auto scrollbar-hide">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">First Name</label>
+                                        <input
+                                            placeholder="e.g. John"
+                                            className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                            value={form.firstName}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    firstName: e.target.value,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Last Name</label>
+                                        <input
+                                            placeholder="e.g. Doe"
+                                            className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                            value={form.lastName}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    lastName: e.target.value,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Email Address</label>
+                                    <input
+                                        placeholder="john.doe@example.com"
+                                        className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                        value={form.email}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                email: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Mobile Number</label>
+                                    <input
+                                        placeholder="10 digit mobile number"
+                                        className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                        value={form.phone}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                            setForm({
+                                                ...form,
+                                                phone: val,
+                                            })
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Branch</label>
+                                        <select
+                                            className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm bg-white"
+                                            value={form.branch}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    branch: e.target.value,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Select Branch</option>
+                                            {branches.map((b) => (
+                                                <option key={b}>{b}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Role</label>
+                                        <select
+                                            className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm bg-white"
+                                            value={form.role}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    role: e.target.value,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Select Role</option>
+                                            {roles.map((r) => (
+                                                <option key={r}>{r}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50">
+                                <button
+                                    onClick={() => setShowForm(false)}
+                                    className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleSave}
                                     disabled={loading}
-                                    className={`px-6 py-2 rounded-lg text-white ${loading
-                                        ? "bg-indigo-300"
-                                        : "bg-indigo-600"
+                                    className={`px-8 py-2.5 rounded-lg text-white font-semibold shadow-md transition-all ${loading
+                                        ? "bg-indigo-300 cursor-not-allowed"
+                                        : "bg-indigo-600 hover:bg-indigo-700 active:transform active:scale-95"
                                         }`}
                                 >
-                                    {loading ? "Saving..." : "Save"}
+                                    {loading ? "Saving..." : "Save Member"}
                                 </button>
                             </div>
                         </div>

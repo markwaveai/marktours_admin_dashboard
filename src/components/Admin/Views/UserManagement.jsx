@@ -13,7 +13,8 @@ const maskMobile = (mobile) => {
   return "*".repeat(Math.max(0, str.length - 4)) + str.slice(-4);
 };
 
-export default function UserManagement() {
+// export default function UserManagement() {
+export default function UserManagement({ setIsModalOpen }) {
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(null);
 
@@ -44,13 +45,12 @@ export default function UserManagement() {
   const [originalUser, setOriginalUser] = useState(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState("User Management");
-  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [activeTab] = useState("User Management");
+  useEffect(() => {
+    if (setIsModalOpen) setIsModalOpen(showForm);
+  }, [showForm, setIsModalOpen]);
 
   // Agent Search State
-  const [agentSearch, setAgentSearch] = useState("");
-  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const [agentsList, setAgentsList] = useState([]);
 
   // Extra Details Management State
   const [showExtraForm, setShowExtraForm] = useState(false);
@@ -83,9 +83,6 @@ export default function UserManagement() {
     const fetchAgents = async () => {
       // Check session storage first to avoid repetitive API calls
       const cachedAgents = sessionStorage.getItem("agentsList");
-      if (cachedAgents) {
-        setAgentsList(JSON.parse(cachedAgents));
-      }
 
       // We can still fetch in background to update, or just rely on cache.
       // To strictly "minimize", we rely on cache and maybe refresh only if empty.
@@ -94,7 +91,6 @@ export default function UserManagement() {
           const res = await fetch(`${BASE_URL}/agents`);
           const data = await res.json();
           if (data.agents) {
-            setAgentsList(data.agents);
             sessionStorage.setItem("agentsList", JSON.stringify(data.agents));
           }
         } catch (e) { console.error("Failed to fetch agents", e); }
@@ -121,11 +117,9 @@ export default function UserManagement() {
 
   const [form, setForm] = useState(emptyForm);
   const [viewImg, setViewImg] = useState(null);
-  const [imgLoading, setImgLoading] = useState(true);
-
   useEffect(() => {
     if (viewImg) {
-      setImgLoading(true);
+      // Image viewing logic if needed
     }
   }, [viewImg]);
 
@@ -238,7 +232,6 @@ export default function UserManagement() {
   const handleAddUser = () => {
     setForm(emptyForm);
     setOriginalUser(null);
-    setAgentSearch("");
     setShowForm(true);
   };
 
@@ -258,8 +251,6 @@ export default function UserManagement() {
       pincode: u.pincode || "",
       express_needs: u.express_needs || ""
     });
-    // Show Agent ID in search box
-    setAgentSearch(u.agent_id ? String(u.agent_id) : "");
     setShowForm(true);
   };
 
@@ -491,109 +482,28 @@ export default function UserManagement() {
                   value={form.pincode}
                   onChange={(e) => setForm({ ...form, pincode: e.target.value })}
                   className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                  placeholder="Pincode"
                 />
               </div>
             </div>
-
-            {/* Agent Search */}
-            <div className="relative mb-3">
-              <label className="text-xs text-gray-500 mb-1 block">Agent ID</label>
-              <input
-                type="text"
-                placeholder="Search Agent ID or Name..."
-                value={agentSearch}
-                onFocus={() => setShowAgentDropdown(true)}
-                onChange={(e) => {
-                  setAgentSearch(e.target.value);
-                  setShowAgentDropdown(true);
-                }}
-                className="w-full border px-3 py-2 rounded"
-              />
-              {showAgentDropdown && agentSearch && (
-                <div className="absolute z-10 w-full bg-white border rounded shadow-lg max-h-40 overflow-y-auto mt-1">
-                  {agentsList
-                    .filter(a =>
-                      a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
-                      String(a.agent_id).includes(agentSearch)
-                    )
-                    .map(a => (
-                      <div
-                        key={a.agent_id}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                        onClick={() => {
-                          setForm({ ...form, agent_id: a.agent_id });
-                          setAgentSearch(String(a.agent_id));
-                          setShowAgentDropdown(false);
-                        }}
-                      >
-                        <span className="font-bold">{a.agent_id}</span> - {a.name} ({a.branch})
-                      </div>
-                    ))}
-                  {agentsList.filter(a =>
-                    a.name.toLowerCase().includes(agentSearch.toLowerCase()) ||
-                    String(a.agent_id).includes(agentSearch)
-                  ).length === 0 && (
-                      <div className="px-3 py-2 text-gray-400 text-sm">No agents found</div>
-                    )}
-                </div>
-              )}
-              {/* Hidden input to store selected ID visually just for debug or reference if needed, 
-                      but logic uses form.agent_id */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 border rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-4 py-2 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"
+              >
+                Save User
+              </button>
             </div>
-
-            <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1 block">Description</label>
-              <textarea
-                value={form.express_needs}
-                onChange={(e) => setForm({ ...form, express_needs: e.target.value })}
-                className="w-full border px-3 py-2 rounded mb-3"
-                placeholder="Express your needs..."
-                rows={3}
-              />
-            </div>
-
-            <button
-              onClick={handleSave}
-              className="w-full bg-indigo-600 text-white py-2 rounded"
-            >
-              Save
-            </button>
           </div>
         </div>
       )}
-
-      {viewImg && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-in fade-in duration-200"
-          onClick={() => setViewImg(null)}
-        >
-          <div className="relative bg-white p-2 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden min-h-[200px] flex items-center justify-center" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => setViewImg(null)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
-            >
-              <FiX size={20} className="text-gray-600" />
-            </button>
-
-            {imgLoading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-0">
-                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-2"></div>
-                <span className="text-sm text-gray-500 font-medium">Loading Image...</span>
-              </div>
-            )}
-
-            <img
-              src={viewImg}
-              alt="Document Preview"
-              onLoad={() => setImgLoading(false)}
-              className={`w-full h-auto max-h-[80vh] object-contain rounded-xl transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ================= EXTRA DETAILS MODAL ================= */}
       {showExtraForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 pt-24 pb-12 overflow-y-auto">
           <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl p-8 border border-gray-100 animate-in zoom-in duration-200">

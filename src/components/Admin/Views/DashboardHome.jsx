@@ -48,7 +48,6 @@ const isUserActive = (u) =>
 export default function DashboardHome() {
   /* ------------------ STATE ------------------ */
   const [usersData, setUsersData] = useState([]);
-  const [agentsData, setAgentsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
   const fetchingRef = useRef(false);
@@ -64,12 +63,8 @@ export default function DashboardHome() {
         const userRes = await fetch("https://marktours-services-jn6cma3vvq-el.a.run.app/user-details?page=1&page_size=1");
         const userData = await userRes.json();
 
-         setTotalRecords(userData.total_records);
+        setTotalRecords(userData.total_records);
         if (userData.user_details) setUsersData(userData.user_details);
-        // Use total_records for "Total Users"
-        if (userData.pagination && userData.pagination.total_records) {
-           
-        }
 
         // We could also fetch agents here if needed, but currently unused
         // const agentRes = await fetch(...)
@@ -84,7 +79,7 @@ export default function DashboardHome() {
         // unless we have specific re-fetch logic. 
         // Given the goal is to stop double-fetch on mount, we can leave it or reset it only on unmount?
         // Let's safe-guard:
-        fetchingRef.current = false; 
+        fetchingRef.current = false;
       }
     };
 
@@ -103,9 +98,9 @@ export default function DashboardHome() {
 
   /* ------------------ STATS ------------------ */
   // const totalUsers = usersData.length;
-  
-  const activeUsers = usersData.filter(isUserActive).length;
-  const totalEmployees = agentsData.length;
+
+  const activeUsersTotal = usersData.filter(isUserActive).length;
+  const totalEmployees = 0; // agentsData is removed
 
   const criticalRisk = usersData.filter(
     (u) => u?.riskLevel === "Critical"
@@ -156,7 +151,7 @@ export default function DashboardHome() {
       {/* ------------------ STAT CARDS ------------------ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mt-5">
         <Widget title="Total Users" value={totalRecords} change="+12%" icon={faUsers} badge="bg-blue-600" />
-        <Widget title="Active Users" value={totalRecords} change="+5%" icon={faUserCheck} badge="bg-green-600" />
+        <Widget title="Active Users" value={activeUsersTotal} change="+5%" icon={faUserCheck} badge="bg-green-600" />
         <Widget title="Employee Management" value={totalEmployees} change="+2" icon={faBriefcase} badge="bg-black" />
         <Widget title="Projected Month EMI" value={totalPendingEMI} change="-2%" icon={faCreditCard} badge="bg-orange-500" />
         <Widget title="Critical Risk" value={criticalRisk} change="0%" icon={faTriangleExclamation} badge="bg-red-600" />

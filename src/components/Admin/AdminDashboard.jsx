@@ -39,6 +39,7 @@ export default function AdminDashboard() {
     localStorage.setItem("adminActiveTab", activeTab);
   }, [activeTab]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const sidebarRef = useRef(null);
 
   useEffect(() => {
@@ -71,6 +72,8 @@ export default function AdminDashboard() {
     { name: "Company-Paid (12th Month)", icon: Gift, component: <CompanyPaid />, disabled: true },
   ];
 
+  const shouldHideHeader = isSidebarOpen || isModalOpen;
+
   const ActiveComponent =
     menuItems.find((item) => item.name === activeTab)?.component ||
     <DashboardHome />;
@@ -90,11 +93,11 @@ export default function AdminDashboard() {
       {/* -------------------- SIDEBAR -------------------- */}
       <aside
         ref={sidebarRef}
-        className={`bg-white border-r border-gray-200 flex-col shadow-lg duration-500 ease-in-out 
+        className={`bg-white border-r border-gray-200 flex-col shadow-lg transition-all duration-500 ease-in-out 
         ${isSidebarOpen
-            ? "w-64 translate-x-0 mr-4"
-            : "w-64 -translate-x-full md:w-0 md:translate-x-0 overflow-hidden"}
-        fixed md:relative z-[70] flex h-full`}
+            ? "w-64 translate-x-0 md:mr-4"
+            : "w-64 -translate-x-full md:w-0 md:translate-x-0 md:mr-0 overflow-hidden"}
+        fixed md:relative z-50 flex h-full`}
       >
         {/* HEADER */}
         <div className="h-20 flex items-center gap-3 px-4 border-b">
@@ -169,10 +172,14 @@ export default function AdminDashboard() {
       </aside>
 
       {/* -------------------- MAIN CONTENT -------------------- */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
 
         {/* TOP HEADER */}
-        <header className="h-16 w-full bg-white border-b flex items-center justify-between px-6 fixed top-0 z-[60] py-5">
+        <header className={`w-full bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-30 transition-all duration-300
+          ${shouldHideHeader
+            ? "opacity-20 pointer-events-none grayscale"
+            : "opacity-100"
+          } h-16 py-5`}>
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button
@@ -185,9 +192,9 @@ export default function AdminDashboard() {
             <h1 className="text-xl font-bold">{activeTab}</h1>
           </div>
 
-          <div className="text-right hidden md:block">
-            <p className="text-xs text-gray-500">Today</p>
-            <p className="text-sm font-bold">
+          <div className="text-right">
+            <p className="text-[10px] text-gray-500 uppercase tracking-tighter">Today</p>
+            <p className="text-xs sm:text-sm font-bold whitespace-nowrap">
               {new Date().toLocaleDateString("en-US", {
                 day: "numeric",
                 month: "short",
@@ -198,9 +205,9 @@ export default function AdminDashboard() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="flex justify-center pt-1 overflow-scroll scrollbar-hide mt-16">
-          <div className="w-[95vw] overflow-scroll scrollbar-hide">
-            {ActiveComponent}
+        <main className="pt-1 overflow-scroll scrollbar-hide bg-gray-50 flex-1">
+          <div className="w-full px-4 overflow-scroll scrollbar-hide">
+            {React.cloneElement(ActiveComponent, { setIsModalOpen })}
           </div>
         </main>
       </div>

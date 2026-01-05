@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import UserManagement from "./UserManagement";
 import EmployeeManagement from "./EmployeeManagement";
 
-export default function DetailsTab() {
+export default function DetailsTab({ setIsModalOpen }) {
     const [activeSubTab, setActiveSubTab] = useState("User Management");
 
     return (
@@ -11,8 +11,8 @@ export default function DetailsTab() {
             <div className="flex space-x-4 border-b">
                 <button
                     className={`pb-2 px-4 text-sm font-medium transition-colors ${activeSubTab === "User Management"
-                            ? "border-b-2 border-indigo-600 text-indigo-600"
-                            : "text-gray-500 hover:text-gray-700"
+                        ? "border-b-2 border-indigo-600 text-indigo-600"
+                        : "text-gray-500 hover:text-gray-700"
                         }`}
                     onClick={() => setActiveSubTab("User Management")}
                 >
@@ -20,8 +20,8 @@ export default function DetailsTab() {
                 </button>
                 <button
                     className={`pb-2 px-4 text-sm font-medium transition-colors ${activeSubTab === "Employee Management"
-                            ? "border-b-2 border-indigo-600 text-indigo-600"
-                            : "text-gray-500 hover:text-gray-700"
+                        ? "border-b-2 border-indigo-600 text-indigo-600"
+                        : "text-gray-500 hover:text-gray-700"
                         }`}
                     onClick={() => setActiveSubTab("Employee Management")}
                 >
@@ -31,8 +31,8 @@ export default function DetailsTab() {
 
             {/* Tab Content */}
             <div className="sticky top-3">
-                {activeSubTab === "User Management" && <UserManagement />}
-                {activeSubTab === "Employee Management" && <EmployeeManagement />}
+                {activeSubTab === "User Management" && <UserManagement setIsModalOpen={setIsModalOpen} />}
+                {activeSubTab === "Employee Management" && <EmployeeManagement setIsModalOpen={setIsModalOpen} />}
             </div>
         </div>
     );
