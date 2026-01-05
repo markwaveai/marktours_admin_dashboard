@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 
-const rotatingLogo = "./images/rotating_logo.webp";
+const rotatingLogo = "./images/rotating_logo.png";
 
-const splashbrand = "./images/splash_brand.webp";
+const splashbrand = "./images/splash_brand.png";
 
 
 

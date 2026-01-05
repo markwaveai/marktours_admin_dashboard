@@ -30,7 +30,7 @@ import TourAssignment from "./Views/TourAssignment";
 import CustomerInterested from "./Views/CustomerInterested";
 import DetailsTab from "./Views/DetailsTab";
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem("adminActiveTab") || "Dashboard";
   });
@@ -78,8 +78,45 @@ export default function AdminDashboard() {
     menuItems.find((item) => item.name === activeTab)?.component ||
     <DashboardHome />;
 
+  /* -------------------- Custom Logout Popup -------------------- */
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+
+      {/* -------------------- LOGOUT MODAL -------------------- */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 mx-4 transform scale-100 animate-in zoom-in-95 duration-200">
+             <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                   <LogOut className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  Are you sure you want to log out of the admin dashboard?
+                </p>
+                <div className="flex w-full gap-3">
+                  <button 
+                    onClick={() => setShowLogoutConfirm(false)}
+                    className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                        if (onLogout) onLogout();
+                        setShowLogoutConfirm(false);
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-200 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* -------------------- SIDEBAR -------------------- */}
       {/* -------------------- OVERLAY (Mobile/Tablet) -------------------- */}
@@ -163,6 +200,7 @@ export default function AdminDashboard() {
           </div>
 
           <button
+            onClick={() => setShowLogoutConfirm(true)}
             className="mt-3 ml-8 p-3 flex items-center justify-center text-xs text-red-600 hover:bg-red-50 py-2 rounded-lg"
           >
             <LogOut className="w-4 h-4 mr-2" />
@@ -205,8 +243,8 @@ export default function AdminDashboard() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="pt-1 overflow-scroll scrollbar-hide bg-gray-50 flex-1">
-          <div className="w-full px-4 overflow-scroll scrollbar-hide">
+        <main className="overflow-y-auto scrollbar-hide bg-gray-50 flex-1">
+          <div className="w-full px-4 pb-4">
             {React.cloneElement(ActiveComponent, { setIsModalOpen })}
           </div>
         </main>

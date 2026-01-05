@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { FiEdit, FiTrash2, FiSearch, FiX } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
+import { useToast } from "../../../context/ToastContext";
 
 const BASE_URL = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 const AGENT_ID = 10001;
@@ -291,15 +292,16 @@ export default function UserManagement({ setIsModalOpen }) {
       if (!res.ok) {
         const errText = await res.text();
         console.error("Save Error:", errText);
-        alert(`Save failed: ${res.status} - ${errText || res.statusText}`);
+        addToast(`Save failed: ${res.status} - ${errText || res.statusText}`, "error");
         return;
       }
 
       await refreshCurrentPage();
       setShowForm(false);
+      addToast(isEdit ? "User updated successfully" : "User created successfully", "success");
     } catch (error) {
       console.error("Save operation failed", error);
-      alert("An error occurred while saving user data.");
+      addToast("An error occurred while saving user data.", "error");
     }
   };
 

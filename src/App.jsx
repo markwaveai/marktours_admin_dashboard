@@ -6,12 +6,27 @@ import Splash from "./components/Splash";
 const LoginPage = lazy(() => import("./components/Login/LoginPage"));
 const AdminDashboard = lazy(() => import("./components/Admin/AdminDashboard"));
 
+import { ToastProvider } from "./context/ToastContext";
+
 export default function App() {
    const [showSplash, setShowSplash] = useState(true);
-   const [showLogin, setShowLogin] = useState(false);
+   // Check local storage for session
+   const [showLogin, setShowLogin] = useState(() => {
+       return !localStorage.getItem("admin_session");
+   });
+
+   const handleLoginSuccess = () => {
+       localStorage.setItem("admin_session", "true");
+       setShowLogin(false);
+   }
+
+   const handleLogout = () => { // We'll need to pass this down eventually, currently logout is mainly in Dashboard
+      localStorage.removeItem("admin_session");
+      setShowLogin(true);
+   }
 
   return (
-    <>
+    <ToastProvider>
       {showSplash ? (
         <Splash onFinish={() => setShowSplash(false)} />
       ) : (
@@ -20,9 +35,14 @@ export default function App() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
           </div>
         }>
-          {showLogin ? <LoginPage setShowLogin={setShowLogin}/> : <AdminDashboard/>}
+          {showLogin ? (
+              <LoginPage setShowLogin={handleLoginSuccess}/> 
+            ) : ( 
+            // We can pass handleLogout if AdminDashboard needs it, or AdminDashboard can manage it via localStorage and just reload
+              <AdminDashboard onLogout={handleLogout} />
+            )}
         </Suspense>
       )}
-    </>
+    </ToastProvider>
   );
 }

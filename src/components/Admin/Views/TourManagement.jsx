@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import SkeletonLoader from "../../Common/SkeletonLoader";
+import { useToast } from "../../../context/ToastContext";
 
 const tourImages = {
   dubai: "/assets/tours/dubai.jpg",
@@ -43,6 +44,7 @@ function TourImage({ src, tourName, className }) {
 }
 
 export default function TourManagement() {
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,6 +58,16 @@ export default function TourManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [toursCache, setToursCache] = useState({});
+  const [pagination, setPagination] = useState({
+      total_records: 0,
+      total_pages: 0,
+      page_size: 9
+  });
+  const fetchingRef = useRef(null);
 
   const [formData, setFormData] = useState({
     id: null,
@@ -80,23 +92,77 @@ export default function TourManagement() {
 
   const [isEdit, setIsEdit] = useState(false);
 
-  const fetchTours = (isInitial = false) => {
-    // if (isInitial) setLoading(true); // Removed to avoid sync state update in effect
-    fetch("https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config")
-      .then((res) => res.json())
-      .then((data) => {
+  const fetchTours = async (page = 1) => {
+    // Check cache first
+    if (toursCache[page]) {
+        setTours(toursCache[page]);
+        setLoading(false);
+        return;
+    }
+
+    // Deduplicate requests
+    if (fetchingRef.current === page) return;
+    fetchingRef.current = page;
+
+    setLoading(true);
+    try {
+        const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
+        const data = await res.json();
+        
+        // The API might return data in different structures, handling both based on user input
+        // adjusting based on assumed structure similar to UserManagement but for tours
+        // If data.tours is the array
+        
         setTours(data.tours || []);
-        if (isInitial) setLoading(false);
-      })
-      .catch((err) => {
+        setPagination({
+            total_records: data.total_records || 0,
+            total_pages: data.total_pages || 1,
+            page_size: data.page_size || 9
+        });
+
+        // Update cache
+        setToursCache(prev => ({
+            ...prev,
+            [page]: data.tours || []
+        }));
+
+    } catch (err) {
         console.error("API error:", err);
-        if (isInitial) setLoading(false);
-      });
+    } finally {
+        setLoading(false);
+        fetchingRef.current = null;
+    }
+  };
+
+  const refreshCurrentPage = async () => {
+    const page = currentPage;
+    setToursCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[page];
+        return newCache;
+    });
+    try {
+        const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
+        const data = await res.json();
+        setTours(data.tours || []);
+        setPagination({
+            total_records: data.total_records || 0,
+            total_pages: data.total_pages || 1,
+            page_size: data.page_size || 9
+        });
+        setToursCache(prev => ({
+            ...prev,
+            [page]: data.tours || []
+        }));
+    } catch (error) {
+        console.error("Failed to refresh tours", error);
+    }
   };
 
   useEffect(() => {
-    fetchTours(true);
-  }, []);
+    fetchTours(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
 
   const handleChange = (e) => {
@@ -163,11 +229,12 @@ export default function TourManagement() {
       .then(() => {
         setShowCreateModal(false);
         resetForm();
-        fetchTours();
+        refreshCurrentPage();
+        addToast(isEdit ? "Tour updated successfully" : "Tour created successfully", "success");
       })
       .catch((err) => {
         console.error("Save tour failed:", err);
-        alert(`Failed: ${err.message}`);
+        addToast(`Failed: ${err.message}`, "error");
       });
   };
 
@@ -179,9 +246,13 @@ export default function TourManagement() {
     })
       .then((res) => {
         if (!res.ok) throw new Error("Delete failed");
-        fetchTours();
+        refreshCurrentPage();
+        addToast("Tour deleted successfully", "success");
       })
-      .catch((err) => console.error("Delete tour failed:", err));
+      .catch((err) => {
+          console.error("Delete tour failed:", err);
+          addToast("Failed to delete tour", "error");
+      });
   };
 
   const handleFileUpload = (e) => {
@@ -189,7 +260,7 @@ export default function TourManagement() {
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image is too large. Please select a file smaller than 2MB.");
+      addToast("Image is too large. Please select a file smaller than 2MB.", "error");
       return;
     }
 
@@ -202,7 +273,7 @@ export default function TourManagement() {
       e.target.value = "";
     };
     reader.onerror = () => {
-      alert("Failed to read file.");
+      addToast("Failed to read file.", "error");
       setUploading(false);
     };
     reader.readAsDataURL(file);
@@ -360,6 +431,55 @@ export default function TourManagement() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ================= PAGINATION CONTROLS ================= */}
+       <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t border-gray-200 bg-white rounded-xl shadow-sm gap-4">
+        <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
+          Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
+        </div>
+        
+        <div className="flex justify-center gap-2 order-1 sm:order-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === 1 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+          >
+            Previous
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              max={pagination.total_pages}
+              value={currentPage}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val) && val >= 1 && val <= pagination.total_pages) {
+                  setCurrentPage(val);
+                }
+              }}
+              className="w-16 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
+            />
+            <span className="text-sm text-gray-600">of {pagination.total_pages}</span>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, pagination.total_pages))}
+            disabled={currentPage === pagination.total_pages}
+            className={`px-3 py-1 border rounded text-sm font-medium transition-colors
+              ${currentPage === pagination.total_pages 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
+          >
+            Next
+          </button>
+        </div>
+        <div className="hidden sm:block order-3"></div>
       </div>
 
       {/* CREATE TOUR MODAL */}
