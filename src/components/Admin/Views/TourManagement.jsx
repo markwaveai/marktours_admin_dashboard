@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
+import { useConfirm } from "../../../context/ConfirmContext";
 
 const tourImages = {
   dubai: "/assets/tours/dubai.jpg",
@@ -45,13 +46,14 @@ function TourImage({ src, tourName, className }) {
 
 export default function TourManagement() {
   const { addToast } = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-      const timer = setTimeout(() => {
-          setLoading(false);
-      }, 1500);
-      return () => clearTimeout(timer);
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   const [tours, setTours] = useState([]);
@@ -63,9 +65,9 @@ export default function TourManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [toursCache, setToursCache] = useState({});
   const [pagination, setPagination] = useState({
-      total_records: 0,
-      total_pages: 0,
-      page_size: 9
+    total_records: 0,
+    total_pages: 0,
+    page_size: 9
   });
   const fetchingRef = useRef(null);
 
@@ -95,9 +97,9 @@ export default function TourManagement() {
   const fetchTours = async (page = 1) => {
     // Check cache first
     if (toursCache[page]) {
-        setTours(toursCache[page]);
-        setLoading(false);
-        return;
+      setTours(toursCache[page]);
+      setLoading(false);
+      return;
     }
 
     // Deduplicate requests
@@ -106,56 +108,56 @@ export default function TourManagement() {
 
     setLoading(true);
     try {
-        const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
-        const data = await res.json();
-        
-        // The API might return data in different structures, handling both based on user input
-        // adjusting based on assumed structure similar to UserManagement but for tours
-        // If data.tours is the array
-        
-        setTours(data.tours || []);
-        setPagination({
-            total_records: data.total_records || 0,
-            total_pages: data.total_pages || 1,
-            page_size: data.page_size || 9
-        });
+      const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
+      const data = await res.json();
 
-        // Update cache
-        setToursCache(prev => ({
-            ...prev,
-            [page]: data.tours || []
-        }));
+      // The API might return data in different structures, handling both based on user input
+      // adjusting based on assumed structure similar to UserManagement but for tours
+      // If data.tours is the array
+
+      setTours(data.tours || []);
+      setPagination({
+        total_records: data.total_records || 0,
+        total_pages: data.total_pages || 1,
+        page_size: data.page_size || 9
+      });
+
+      // Update cache
+      setToursCache(prev => ({
+        ...prev,
+        [page]: data.tours || []
+      }));
 
     } catch (err) {
-        console.error("API error:", err);
+      console.error("API error:", err);
     } finally {
-        setLoading(false);
-        fetchingRef.current = null;
+      setLoading(false);
+      fetchingRef.current = null;
     }
   };
 
   const refreshCurrentPage = async () => {
     const page = currentPage;
     setToursCache(prev => {
-        const newCache = { ...prev };
-        delete newCache[page];
-        return newCache;
+      const newCache = { ...prev };
+      delete newCache[page];
+      return newCache;
     });
     try {
-        const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
-        const data = await res.json();
-        setTours(data.tours || []);
-        setPagination({
-            total_records: data.total_records || 0,
-            total_pages: data.total_pages || 1,
-            page_size: data.page_size || 9
-        });
-        setToursCache(prev => ({
-            ...prev,
-            [page]: data.tours || []
-        }));
+      const res = await fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config?page=${page}&page_size=9`);
+      const data = await res.json();
+      setTours(data.tours || []);
+      setPagination({
+        total_records: data.total_records || 0,
+        total_pages: data.total_pages || 1,
+        page_size: data.page_size || 9
+      });
+      setToursCache(prev => ({
+        ...prev,
+        [page]: data.tours || []
+      }));
     } catch (error) {
-        console.error("Failed to refresh tours", error);
+      console.error("Failed to refresh tours", error);
     }
   };
 
@@ -238,8 +240,15 @@ export default function TourManagement() {
       });
   };
 
-  const handleDeleteTour = (tourCode) => {
-    if (!window.confirm("Are you sure you want to delete this tour?")) return;
+  const handleDeleteTour = async (tourCode) => {
+    const isConfirmed = await confirm({
+      title: "Delete Tour?",
+      message: "Are you sure you want to delete this tour? This will remove all tour configurations.",
+      confirmText: "Delete",
+      type: "danger"
+    });
+
+    if (!isConfirmed) return;
 
     fetch(`https://marktours-services-jn6cma3vvq-el.a.run.app/tours-config/${tourCode}`, {
       method: "DELETE",
@@ -250,8 +259,8 @@ export default function TourManagement() {
         addToast("Tour deleted successfully", "success");
       })
       .catch((err) => {
-          console.error("Delete tour failed:", err);
-          addToast("Failed to delete tour", "error");
+        console.error("Delete tour failed:", err);
+        addToast("Failed to delete tour", "error");
       });
   };
 
@@ -326,48 +335,48 @@ export default function TourManagement() {
       depature_place: "",
       days_count: "",
       nights_count: "",
-      
+
       tour_image_url: "",
     });
     setIsEdit(false);
   };
 
-    const filteredTours = tours.filter((t) =>
-        `${t.tour_name} ${t.tour_code}`.toLowerCase().includes(search.toLowerCase())
-    );
+  const filteredTours = tours.filter((t) =>
+    `${t.tour_name} ${t.tour_code}`.toLowerCase().includes(search.toLowerCase())
+  );
 
-    if (loading) {
-        return <SkeletonLoader type="card" count={6} />;
-    }
+  if (loading) {
+    return <SkeletonLoader type="card" count={6} />;
+  }
 
-    return (
-        <div className="space-y-6 mb-5">
+  return (
+    <div className="space-y-6 mb-5">
       <div className="sticky top-0 z-30 bg-gray-50 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 className="text-lg font-bold text-gray-800">Tour Management</h2>
-        
+
         <div className="flex gap-3 w-full sm:w-auto">
-             <div className="relative flex-1 sm:w-64">
-                <input 
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white border border-gray-200 focus:border-indigo-500 outline-none transition-all shadow-sm"
-                    placeholder="Search tours..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-                 <svg 
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </div>
-            <button
+          <div className="relative flex-1 sm:w-64">
+            <input
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white border border-gray-200 focus:border-indigo-500 outline-none transition-all shadow-sm"
+              placeholder="Search tours..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
             onClick={handleCreateClick}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-indigo-700 whitespace-nowrap shadow-sm"
-            >
+          >
             + Create Tour
-            </button>
+          </button>
         </div>
       </div>
 
@@ -434,23 +443,23 @@ export default function TourManagement() {
       </div>
 
       {/* ================= PAGINATION CONTROLS ================= */}
-       <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t border-gray-200 bg-white rounded-xl shadow-sm gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t border-gray-200 bg-white rounded-xl shadow-sm gap-4">
         <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
           Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
         </div>
-        
+
         <div className="flex justify-center gap-2 order-1 sm:order-2">
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
             className={`px-3 py-1 border rounded text-sm font-medium transition-colors
-              ${currentPage === 1 
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+              ${currentPage === 1
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                 : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
           >
             Previous
           </button>
-          
+
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -472,8 +481,8 @@ export default function TourManagement() {
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, pagination.total_pages))}
             disabled={currentPage === pagination.total_pages}
             className={`px-3 py-1 border rounded text-sm font-medium transition-colors
-              ${currentPage === pagination.total_pages 
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+              ${currentPage === pagination.total_pages
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                 : "bg-white text-gray-700 hover:bg-gray-50 hover:text-indigo-600"}`}
           >
             Next
@@ -522,7 +531,7 @@ export default function TourManagement() {
                     required
                   />
                 </div>
-              <div>
+                <div>
                   <label className="text-xs font-semibold text-gray-500">EMI Per Month (₹)</label>
                   <input
                     type="number"
@@ -533,7 +542,7 @@ export default function TourManagement() {
                     className="w-full border rounded-lg p-2 text-sm"
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Start Date</label>
                   <input
@@ -602,9 +611,9 @@ export default function TourManagement() {
                   />
                 </div>
 
-                
 
-              
+
+
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Days Count</label>

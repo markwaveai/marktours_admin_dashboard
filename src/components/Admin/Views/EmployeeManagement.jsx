@@ -7,10 +7,14 @@ import {
 } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
+import { useToast } from "../../../context/ToastContext";
+import { useConfirm } from "../../../context/ConfirmContext";
 
 const API_BASE = "https://marktours-services-jn6cma3vvq-el.a.run.app";
 
 export default function EmployeeManagement({ setIsModalOpen }) {
+    const { addToast } = useToast();
+    const confirm = useConfirm();
     const [employeesData, setEmployeesData] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
@@ -211,7 +215,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
             setShowForm(true);
         } catch (err) {
             console.error(err);
-            alert("Failed to load agent");
+            addToast("Failed to load agent", "error");
         } finally {
             setLoading(false);
         }
@@ -220,14 +224,16 @@ export default function EmployeeManagement({ setIsModalOpen }) {
     /* ================= VALIDATION ================= */
     const validateForm = () => {
         const e = {};
-        if (!form.firstName) e.firstName = "First name required";
-        if (!form.lastName) e.lastName = "Last name required";
-        if (!form.email.includes("@")) e.email = "Invalid email";
-        if (!/^\d{10}$/.test(form.phone)) e.phone = "Invalid mobile";
+        if (!form.firstName) e.firstName = "First name is required";
+        if (!form.lastName) e.lastName = "Last name is required";
+        if (!form.email || !form.email.includes("@")) e.email = "A valid email is required";
+        if (!form.phone || !/^\d{10}$/.test(form.phone)) e.phone = "A valid 10-digit mobile number is required";
+        if (!form.branch) e.branch = "Branch selection is required";
+        if (!form.role) e.role = "Role selection is required";
 
 
         if (Object.keys(e).length) {
-            alert(Object.values(e)[0]);
+            addToast(Object.values(e)[0], "error");
             return false;
         }
         return true;
@@ -270,8 +276,9 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                 await refreshCurrentPage();
                 setShowForm(false);
                 setForm(emptyForm);
+                addToast(isEdit ? "Agent updated successfully!" : "Agent added successfully!", "success");
             } catch (err) {
-                alert(err.message);
+                addToast(err.message, "error");
             } finally {
                 setLoading(false);
             }
@@ -293,13 +300,21 @@ export default function EmployeeManagement({ setIsModalOpen }) {
 
     /* ================= DELETE ================= */
     const handleDelete = async (id) => {
-        if (!window.confirm("Delete agent?")) return;
+        const isConfirmed = await confirm({
+            title: "Delete Agent?",
+            message: "Are you sure you want to delete this agent? This action cannot be undone.",
+            confirmText: "Delete",
+            type: "danger"
+        });
+
+        if (!isConfirmed) return;
 
         try {
             await fetch(`${API_BASE}/agents/${id}`, { method: "DELETE" });
             await refreshCurrentPage();
+            addToast("Agent deleted successfully!", "success");
         } catch {
-            alert("Delete failed");
+            addToast("Delete failed", "error");
         }
     };
 
@@ -360,7 +375,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                             <tr>
                                 {[
                                     "S.No",
-                                    "Agent ID",
+                                    "Emp ID",
                                     "Name",
                                     "Email",
                                     "Mobile",
@@ -497,8 +512,11 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                             <div className="px-6 py-6 space-y-5 max-h-[65vh] overflow-y-auto scrollbar-hide">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">First Name</label>
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                            First Name <span className="text-red-500">*</span>
+                                        </label>
                                         <input
+                                            required
                                             placeholder="e.g. John"
                                             className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                             value={form.firstName}
@@ -511,8 +529,11 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Last Name</label>
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                            Last Name <span className="text-red-500">*</span>
+                                        </label>
                                         <input
+                                            required
                                             placeholder="e.g. Doe"
                                             className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                             value={form.lastName}
@@ -527,8 +548,12 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Email Address</label>
+                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                        Email Address <span className="text-red-500">*</span>
+                                    </label>
                                     <input
+                                        required
+                                        type="email"
                                         placeholder="john.doe@example.com"
                                         className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                         value={form.email}
@@ -542,12 +567,17 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Mobile Number</label>
+                                    <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                        Mobile Number <span className="text-red-500">*</span>
+                                    </label>
                                     <input
+                                        required
                                         placeholder="10 digit mobile number"
-                                        className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                        className={`border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${isEdit ? "bg-gray-100 cursor-not-allowed" : ""}`}
                                         value={form.phone}
+                                        readOnly={isEdit}
                                         onChange={(e) => {
+                                            if (isEdit) return;
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                                             setForm({
                                                 ...form,
@@ -559,8 +589,11 @@ export default function EmployeeManagement({ setIsModalOpen }) {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Branch</label>
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                            Branch <span className="text-red-500">*</span>
+                                        </label>
                                         <select
+                                            required
                                             className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm bg-white"
                                             value={form.branch}
                                             onChange={(e) =>
@@ -577,8 +610,11 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">Role</label>
+                                        <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
+                                            Role <span className="text-red-500">*</span>
+                                        </label>
                                         <select
+                                            required
                                             className="border border-gray-300 rounded-lg px-3 py-2.5 w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm bg-white"
                                             value={form.role}
                                             onChange={(e) =>

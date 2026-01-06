@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Search, Filter, Calendar, UserPlus, ArrowRight } from "lucide-react";
 import SkeletonLoader from "../../Common/SkeletonLoader";
+import { useToast } from "../../../context/ToastContext";
 
 const usersDataRaw = [
     { id: 1, name: "Alice Johnson", email: "alice@example.com", tour: "Europe Escape", batch: "Oct 2023" },
@@ -10,6 +11,7 @@ const usersDataRaw = [
 ];
 
 export default function TourAssignment() {
+    const { addToast } = useToast();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -57,7 +59,7 @@ export default function TourAssignment() {
 
     const handleMoveUser = () => {
         if (!targetBatch) {
-            alert("Please select a batch to move the user to.");
+            addToast("Please select a batch to move the user to.", "error");
             return;
         }
 
@@ -69,11 +71,11 @@ export default function TourAssignment() {
         }));
 
         setMoveUserModal({ show: false, user: null, tourName: null, currentBatch: null });
-        alert(`User moved to ${targetBatch} successfully!`);
+        addToast(`User moved to ${targetBatch} successfully!`, "success");
     };
 
     // Derived batches for the dropdown (from explicit batches state)
-    const availableBatchesForMove = moveUserModal.tourName 
+    const availableBatchesForMove = moveUserModal.tourName
         ? batches.filter(b => b.tour === moveUserModal.tourName && b.name !== moveUserModal.currentBatch).map(b => b.name).sort()
         : [];
 
@@ -81,7 +83,7 @@ export default function TourAssignment() {
     // Group data for display (driven by batches state)
     const tourBatches = tours.filter(t => t !== "All").map(tourName => {
         const tourSpecificBatches = batches.filter(b => b.tour === tourName).sort((a, b) => a.name.localeCompare(b.name));
-        
+
         return {
             tourName,
             batches: tourSpecificBatches.map(batch => ({
@@ -109,13 +111,13 @@ export default function TourAssignment() {
     };
 
     const handleSelectAllInCreate = () => {
-        const filtered = users.filter(u => 
+        const filtered = users.filter(u =>
             u.name.toLowerCase().includes(createBatchSearch.toLowerCase()) ||
             u.email.toLowerCase().includes(createBatchSearch.toLowerCase())
         );
         const filteredIds = filtered.map(u => u.id.toString());
         const allSelected = filteredIds.length > 0 && filteredIds.every(id => newBatchData.selectedUserIds.includes(id));
-        
+
         if (allSelected) {
             setNewBatchData(prev => ({
                 ...prev,
@@ -131,23 +133,23 @@ export default function TourAssignment() {
 
     const handleCreateBatch = (e) => {
         e.preventDefault();
-        
+
         if (!newBatchData.startDate || !newBatchData.capacity || newBatchData.selectedUserIds.length === 0) {
-            alert("Please fill all fields and select at least one user.");
+            addToast("Please fill all fields and select at least one user.", "error");
             return;
         }
 
         const selectedDate = new Date(newBatchData.startDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         if (selectedDate < today) {
-            alert("Please select a present or future date for the batch.");
+            addToast("Please select a present or future date for the batch.", "error");
             return;
         }
 
         const batchName = format(selectedDate, "MMM yyyy");
-        
+
         // Add new batch to state if it doesn't exist
         setBatches(prev => {
             const exists = prev.some(b => b.tour === targetTour && b.name === batchName);
@@ -158,9 +160,9 @@ export default function TourAssignment() {
         });
 
         setUsers(prevUsers => prevUsers.map(u => {
-            if (newBatchData.selectedUserIds.includes(u.id.toString())) { 
+            if (newBatchData.selectedUserIds.includes(u.id.toString())) {
                 // Assign to the TARGET tour
-                return { ...u, batch: batchName, tour: targetTour }; 
+                return { ...u, batch: batchName, tour: targetTour };
             }
             return u;
         }));
@@ -168,7 +170,7 @@ export default function TourAssignment() {
         setShowCreateBatchModal(false);
         setNewBatchData({ startDate: "", capacity: "", selectedUserIds: [] });
         setTargetTour(null);
-        alert(`Batch ${batchName} created for ${targetTour} successfully!`);
+        addToast(`Batch ${batchName} created successfully!`, "success");
     };
 
     const toggleUserSelection = (userId) => {
@@ -195,14 +197,14 @@ export default function TourAssignment() {
     };
 
     const handleSelectAllInAdd = () => {
-        const filtered = users.filter(u => 
+        const filtered = users.filter(u =>
             u.batch !== addTravelerModal.batchName &&
             (u.name.toLowerCase().includes(addTravelerSearch.toLowerCase()) ||
-             u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
+                u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
         );
         const filteredIds = filtered.map(u => String(u.id));
         const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedUsersToAdd.includes(id));
-        
+
         if (allSelected) {
             setSelectedUsersToAdd(prev => prev.filter(id => !filteredIds.includes(id)));
         } else {
@@ -212,9 +214,9 @@ export default function TourAssignment() {
 
     const handleAddTraveler = (e) => {
         if (e && e.preventDefault) e.preventDefault();
-        
+
         if (selectedUsersToAdd.length === 0) {
-            alert("Please select at least one traveler from the list below.");
+            addToast("Please select at least one traveler.", "error");
             return;
         }
 
@@ -229,7 +231,7 @@ export default function TourAssignment() {
 
         setAddTravelerModal({ show: false, tourName: null, batchName: null });
         setSelectedUsersToAdd([]);
-        alert(`${count} traveler(s) added to "${addTravelerModal.batchName}" successfully!`);
+        addToast(`${count} traveler(s) added successfully!`, "success");
     };
 
     const toggleAddUserSelection = (userId) => {
@@ -240,9 +242,9 @@ export default function TourAssignment() {
         });
     };
 
-  if (loading) {
-      return <SkeletonLoader type="dashboard" count={1} />; // Using dashboard/custom type or just return earlier
-  }
+    if (loading) {
+        return <SkeletonLoader type="dashboard" count={1} />; // Using dashboard/custom type or just return earlier
+    }
 
     return (
         <div className="space-y-8 relative">
@@ -276,13 +278,13 @@ export default function TourAssignment() {
                                 )}
                             </div>
                             <div className="pt-2 flex gap-3">
-                                <button 
+                                <button
                                     onClick={() => setMoveUserModal({ show: false, user: null })}
                                     className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleMoveUser}
                                     disabled={!targetBatch}
                                     className={`flex-1 py-2 rounded-lg text-sm font-medium text-white shadow-sm ${!targetBatch ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
@@ -308,66 +310,66 @@ export default function TourAssignment() {
                         <form onSubmit={handleCreateBatch} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Batch Starting Date</label>
-                                <input 
-                                    type="date" 
+                                <input
+                                    type="date"
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                     value={newBatchData.startDate}
-                                    onChange={(e) => setNewBatchData({...newBatchData, startDate: e.target.value})}
+                                    onChange={(e) => setNewBatchData({ ...newBatchData, startDate: e.target.value })}
                                     min={new Date().toISOString().split('T')[0]}
-                                    required 
+                                    required
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
-                                <input 
-                                    type="number" 
+                                <input
+                                    type="number"
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                     value={newBatchData.capacity}
-                                    onChange={(e) => setNewBatchData({...newBatchData, capacity: e.target.value})}
+                                    onChange={(e) => setNewBatchData({ ...newBatchData, capacity: e.target.value })}
                                     placeholder="e.g 50"
-                                    required 
+                                    required
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Users</label>
                                 <div className="flex gap-2 mb-2">
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Search users..."
                                         className="flex-grow border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
                                         value={createBatchSearch}
                                         onChange={(e) => setCreateBatchSearch(e.target.value)}
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={handleSelectAllInCreate}
                                         className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-medium transition"
                                     >
-                                        {users.filter(u => 
+                                        {users.filter(u =>
                                             u.name.toLowerCase().includes(createBatchSearch.toLowerCase()) ||
                                             u.email.toLowerCase().includes(createBatchSearch.toLowerCase())
                                         ).every(u => newBatchData.selectedUserIds.includes(u.id.toString())) ? "Deselect All" : "Select All"}
                                     </button>
                                 </div>
                                 <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                                    {users.filter(u => 
+                                    {users.filter(u =>
                                         u.name.toLowerCase().includes(createBatchSearch.toLowerCase()) ||
                                         u.email.toLowerCase().includes(createBatchSearch.toLowerCase())
                                     ).length === 0 ? (
                                         <div className="text-center py-6 text-gray-500 italic">No users found.</div>
                                     ) : (
-                                        users.filter(u => 
+                                        users.filter(u =>
                                             u.name.toLowerCase().includes(createBatchSearch.toLowerCase()) ||
                                             u.email.toLowerCase().includes(createBatchSearch.toLowerCase())
                                         ).map(u => (
-                                            <div 
-                                                key={u.id} 
+                                            <div
+                                                key={u.id}
                                                 onClick={() => toggleUserSelection(u.id)}
                                                 className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer group border border-transparent hover:border-indigo-100 transition shadow-sm"
                                             >
-                                                <input 
+                                                <input
                                                     type="checkbox"
-                                                    checked={newBatchData.selectedUserIds.includes(String(u.id))} 
+                                                    checked={newBatchData.selectedUserIds.includes(String(u.id))}
                                                     readOnly
                                                     className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                                                 />
@@ -387,17 +389,17 @@ export default function TourAssignment() {
                                     <span>Available for batch: {users.length}</span>
                                 </div>
                             </div>
-                            
+
                             <div className="pt-4 flex gap-3">
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     onClick={() => setShowCreateBatchModal(false)}
                                     className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     disabled={newBatchData.selectedUserIds.length === 0}
                                     className={`flex-1 py-2 rounded-lg text-sm font-medium text-white shadow-sm transition ${newBatchData.selectedUserIds.length > 0 ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-400 cursor-not-allowed'}`}
                                 >
@@ -423,46 +425,46 @@ export default function TourAssignment() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Travelers to Add (from users.json)</label>
                                 <div className="flex gap-2 mb-2">
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Search travelers..."
                                         className="flex-grow border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
                                         value={addTravelerSearch}
                                         onChange={(e) => setAddTravelerSearch(e.target.value)}
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={handleSelectAllInAdd}
                                         className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-medium transition"
                                     >
-                                        {users.filter(u => 
+                                        {users.filter(u =>
                                             u.batch !== addTravelerModal.batchName &&
                                             (u.name.toLowerCase().includes(addTravelerSearch.toLowerCase()) ||
-                                             u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
+                                                u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
                                         ).every(u => selectedUsersToAdd.includes(u.id.toString())) ? "Deselect All" : "Select All"}
                                     </button>
                                 </div>
                                 <div className="border border-gray-300 rounded-lg max-h-60 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                                    {users.filter(u => 
+                                    {users.filter(u =>
                                         u.batch !== addTravelerModal.batchName &&
                                         (u.name.toLowerCase().includes(addTravelerSearch.toLowerCase()) ||
-                                         u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
+                                            u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
                                     ).length === 0 ? (
                                         <div className="text-center py-8 text-gray-500 italic">No travelers found matching your search.</div>
                                     ) : (
-                                        users.filter(u => 
+                                        users.filter(u =>
                                             u.batch !== addTravelerModal.batchName &&
                                             (u.name.toLowerCase().includes(addTravelerSearch.toLowerCase()) ||
-                                             u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
+                                                u.email.toLowerCase().includes(addTravelerSearch.toLowerCase()))
                                         ).map(u => (
-                                            <div 
-                                                key={u.id} 
+                                            <div
+                                                key={u.id}
                                                 onClick={() => toggleAddUserSelection(u.id)}
                                                 className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer group border border-transparent hover:border-indigo-100 transition shadow-sm"
                                             >
-                                                <input 
+                                                <input
                                                     type="checkbox"
-                                                    checked={selectedUsersToAdd.includes(String(u.id))} 
+                                                    checked={selectedUsersToAdd.includes(String(u.id))}
                                                     readOnly
                                                     className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                                                 />
@@ -483,13 +485,13 @@ export default function TourAssignment() {
                                 </div>
                             </div>
                             <div className="pt-2 flex gap-3">
-                                <button 
+                                <button
                                     onClick={() => setAddTravelerModal({ show: false, tourName: null, batchName: null })}
                                     className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleAddTraveler}
                                     className={`flex-1 py-2 rounded-lg text-sm font-medium text-white shadow-sm transition ${selectedUsersToAdd.length > 0 ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-400 cursor-not-allowed'}`}
                                 >
@@ -595,7 +597,7 @@ export default function TourAssignment() {
 
                                         {/* Footer Action */}
                                         <div className="mt-4 pt-4 border-t border-gray-100 text-center mt-auto">
-                                            <button 
+                                            <button
                                                 onClick={() => openAddTravelerModal(tour.tourName, batch.batchName)}
                                                 className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-indigo-500 hover:text-indigo-600 font-medium transition flex items-center justify-center gap-2"
                                             >
@@ -608,7 +610,7 @@ export default function TourAssignment() {
                             })}
 
                             {/* New Batch Card Placeholder */}
-                            <div 
+                            <div
                                 onClick={() => openCreateBatchModal(tour.tourName)}
                                 className="border border-dashed border-gray-300 rounded-lg p-5 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer min-h-[250px]"
                             >
@@ -644,6 +646,6 @@ function PlaneIcon() {
             <path d="M2 12h20" />
             <path d="M13 2l9 10-9 10" />
         </svg>
-       
+
     );
 }
