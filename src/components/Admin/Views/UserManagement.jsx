@@ -139,7 +139,7 @@ export default function UserManagement({ setIsModalOpen }) {
     address: "",
     is_active: true,
     agent_id: "",
-    dob: "",
+    dob: new Date().toISOString().split("T")[0],
     pincode: "",
     express_needs: "",
     first_name: "",
@@ -175,21 +175,21 @@ export default function UserManagement({ setIsModalOpen }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/user-details?page=${page}&page_size=15`);
+      const res = await fetch(`${BASE_URL}/user-details/user-tour-summary?is_active=true&page=${page}&size=15`);
       const data = await res.json();
 
-      if (data.status === "success") {
-        setUsersData(data.user_details || []);
+      if (data.data) {
+        setUsersData(data.data || []);
         setPagination({
-          total_records: data.total_records,
-          total_pages: data.total_pages,
-          page_size: data.page_size
+          total_records: data.total_records || data.pagination?.total_records || 0,
+          total_pages: data.total_pages || data.pagination?.total_pages || 1,
+          page_size: 15
         });
 
         // Update cache
         setUsersCache(prev => ({
           ...prev,
-          [page]: data.user_details || []
+          [page]: data.data || []
         }));
       }
     } catch (error) {
@@ -217,18 +217,18 @@ export default function UserManagement({ setIsModalOpen }) {
     // We need to call fetch explicitly after cache invalidation logic is settled 
     // or just force fetch. For simplicity, let's just force fetch logic:
     try {
-      const res = await fetch(`${BASE_URL}/user-details?is_active=true&page=${page}&page_size=15`);
+      const res = await fetch(`${BASE_URL}/user-details/user-tour-summary?is_active=true&page=${page}&size=15`);
       const data = await res.json();
-      if (data.status === "success") {
-        setUsersData(data.user_details || []);
+      if (data.data) {
+        setUsersData(data.data || []);
         setPagination({
-          total_records: data.total_records,
-          total_pages: data.total_pages,
-          page_size: data.page_size
+          total_records: data.total_records || data.pagination?.total_records || 0,
+          total_pages: data.total_pages || data.pagination?.total_pages || 1,
+          page_size: 15
         });
         setUsersCache(prev => ({
           ...prev,
-          [page]: data.user_details || []
+          [page]: data.data || []
         }));
       }
     } catch (error) {
@@ -490,7 +490,7 @@ export default function UserManagement({ setIsModalOpen }) {
             </div>
 
             {/* Name Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">First Name</label>
                 <input
@@ -524,7 +524,7 @@ export default function UserManagement({ setIsModalOpen }) {
             </div>
 
             {/* Mobile & Branch */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Mobile</label>
                 <input
@@ -588,16 +588,14 @@ export default function UserManagement({ setIsModalOpen }) {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Date of Birth</label>
                 <input
-                  type={form.dob ? "date" : "text"}
-                  onFocus={(e) => (e.target.type = "date")}
-                  onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
+                  type="date"
                   value={form.dob}
                   onChange={(e) => setForm({ ...form, dob: e.target.value })}
-                  className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
                   placeholder="Date of Birth"
                 />
               </div>
@@ -649,7 +647,7 @@ export default function UserManagement({ setIsModalOpen }) {
 
             <div className="space-y-8 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
               {/* Personal Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6">
                 {["name", "surname", "mobile", "dob", "nationality", "gender", "relationship"].map((f) => (
                   <div key={f} className={f === 'relationship' ? 'md:col-span-2' : ''}>
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">{f.replace('_', ' ')}</label>
@@ -672,7 +670,7 @@ export default function UserManagement({ setIsModalOpen }) {
               {/* Passport Details Grid */}
               <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 space-y-6">
                 <h5 className="text-xs font-bold text-gray-900 uppercase tracking-widest">Passport Details</h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-6">
                   {["passportno", "issuedby", "dateofissued", "dateofexpired", "tour_code"].map((f) => (
                     <div key={f} className={f === 'tour_code' ? 'md:col-span-2' : ''}>
                       <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">{f.replace('dateof', 'date of ')}</label>
@@ -764,8 +762,14 @@ export default function UserManagement({ setIsModalOpen }) {
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Email</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Mobile</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Branch</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[200px]">Tour Name</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Tour Code</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">EMI / Month</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Paid</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Remaining</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Booking Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -783,7 +787,17 @@ export default function UserManagement({ setIsModalOpen }) {
                       <td className="px-4 py-3 text-center">{u.email}</td>
                       <td className="px-4 py-3 text-center">{u.mobile}</td>
                       <td className="px-4 py-3 text-center">{u.branch}</td>
+                      <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
+                      <td className="px-4 py-3 text-center">{u.tour_code || "-"}</td>
+                      <td className="px-4 py-3 text-center">{u.emi_per_month || 0}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid || 0}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining || 0}</td>
                       <td className="px-4 py-3 text-center">
+                         <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-yellow-800 bg-yellow-100'}`}>
+                            {u.booking_status || "Pending"}
+                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-center bg-gray-50">
                         <span className={`inline-flex px-2 text-xs font-semibold leading-5 text-green-800 bg-green-100 rounded-full
                       ${!u.is_active && "text-red-800 bg-red-100"}`}>
                           {u.is_active ? "Active" : "Inactive"}
@@ -818,7 +832,7 @@ export default function UserManagement({ setIsModalOpen }) {
                     {/* ================= EXTRA DETAILS ================= */}
                     {expandedUserId === u.user_id && (
                       <tr>
-                        <td colSpan="8" className="p-0 border-b">
+                        <td colSpan="14" className="p-0 border-b">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
                             {extraLoading ? (
                               <SkeletonLoader type="table" count={5} />

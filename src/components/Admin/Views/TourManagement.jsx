@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { FiX, FiCalendar } from "react-icons/fi";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
 import { useConfirm } from "../../../context/ConfirmContext";
@@ -77,19 +78,28 @@ export default function TourManagement() {
     setPageInput(currentPage);
   }, [currentPage]);
 
+  // Helper to get today as dd-mm-yyyy
+  const getTodayDDMMYYYY = () => {
+    const today = new Date();
+    const d = String(today.getDate()).padStart(2, '0');
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const y = today.getFullYear();
+    return `${d}-${m}-${y}`;
+  };
+
   const [formData, setFormData] = useState({
     id: null,
     tour_name: "",
     tour_code: "",
-    start_date: "",
-    end_date: "",
+    start_date: getTodayDDMMYYYY(),
+    end_date: getTodayDDMMYYYY(),
     slots: "",
     tour_description: "",
     package_price: "",
     available_slots: "",
     booked_slots: "",
-    arrival_at: "",
-    depature_at: "",
+    arrival_at: getTodayDDMMYYYY(),
+    depature_at: getTodayDDMMYYYY(),
     arrivals_place: "",
     depature_place: "",
     days_count: "",
@@ -187,10 +197,18 @@ export default function TourManagement() {
     const method = isEdit ? "PUT" : "POST";
 
     // Helper to format date for API (adding time if missing)
+    // Helper to format date for API (dd-mm-yyyy -> yyyy-mm-ddT...)
     const formatDateTime = (dateStr) => {
       if (!dateStr) return null;
       if (dateStr.includes("T")) return dateStr;
-      return `${dateStr}T09:00:00`; // Default time as seen in sample
+      
+      // Convert dd-mm-yyyy to yyyy-mm-dd
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+         const [d, m, y] = parts;
+         return `${y}-${m}-${d}T09:00:00`;
+      }
+      return null;
     };
 
     // Automatic Tour Code generation (e.g., DU123015)
@@ -300,6 +318,14 @@ export default function TourManagement() {
   };
 
   const handleEditClick = (tour) => {
+    // Helper to convert yyyy-mm-dd (or ISO) to dd-mm-yyyy
+    const toDDMMYYYY = (isoStr) => {
+       if (!isoStr) return "";
+       const datePart = isoStr.split("T")[0]; // yyyy-mm-dd
+       const [y, m, d] = datePart.split("-");
+       return `${d}-${m}-${y}`;
+    };
+
     setFormData({
       ...tour,
       slots: tour.slots?.toString() || "",
@@ -310,10 +336,10 @@ export default function TourManagement() {
       nights_count: tour.nights_count?.toString() || "",
       emi_per_month: tour.emi_per_month?.toString() || "",
       tour_image_url: tour.tour_image_url || "",
-      start_date: tour.start_date?.split("T")[0] || "",
-      end_date: tour.end_date?.split("T")[0] || "",
-      arrival_at: tour.arrival_at?.split("T")[0] || "",
-      depature_at: tour.depature_at?.split("T")[0] || "",
+      start_date: toDDMMYYYY(tour.start_date),
+      end_date: toDDMMYYYY(tour.end_date),
+      arrival_at: toDDMMYYYY(tour.arrival_at),
+      depature_at: toDDMMYYYY(tour.depature_at),
       tour_description: tour.tour_description || "",
       arrivals_place: tour.arrivals_place || "",
       depature_place: tour.depature_place || "",
@@ -333,18 +359,41 @@ export default function TourManagement() {
       emi_per_month: "",
       available_slots: "",
       booked_slots: "",
-      start_date: "",
-      end_date: "",
-      arrival_at: "",
-      depature_at: "",
+      start_date: getTodayDDMMYYYY(),
+      end_date: getTodayDDMMYYYY(),
+      arrival_at: getTodayDDMMYYYY(),
+      depature_at: getTodayDDMMYYYY(),
       arrivals_place: "",
       depature_place: "",
       days_count: "",
       nights_count: "",
-
       tour_image_url: "",
     });
     setIsEdit(false);
+  };
+
+  const handleDateChange = (e, fieldName) => {
+    let val = e.target.value.replace(/[^0-9]/g, ""); // Only numbers
+    if (val.length > 8) val = val.slice(0, 8); // Max 8 digits (ddmmyyyy)
+
+    // Masking logic
+    let formatted = val;
+    if (val.length > 4) {
+       formatted = `${val.slice(0, 2)}-${val.slice(2, 4)}-${val.slice(4)}`;
+    } else if (val.length > 2) {
+       formatted = `${val.slice(0, 2)}-${val.slice(2)}`;
+    }
+
+    setFormData({ ...formData, [fieldName]: formatted });
+  };
+
+  const handlePickerChange = (e, fieldName) => {
+     // Picker returns yyyy-mm-dd
+     const val = e.target.value; 
+     if(!val) return;
+     const [y, m, d] = val.split("-");
+     const formatted = `${d}-${m}-${y}`;
+     setFormData({ ...formData, [fieldName]: formatted });
   };
 
   const filteredTours = tours.filter((t) =>
@@ -513,19 +562,27 @@ export default function TourManagement() {
       {/* CREATE TOUR MODAL */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 -top-6"
           onClick={() => setShowCreateModal(false)}
         >
           <div
             className="bg-white w-[95%] sm:max-w-md rounded-xl p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold mb-4">
-              {isEdit ? "Edit Tour" : "Create New Tour"}
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">
+                {isEdit ? "Edit Tour" : "Create New Tour"}
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <FiX size={20} className="text-gray-500" />
+              </button>
+            </div>
 
-            <form onSubmit={handleSaveTour} className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleSaveTour} className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-gray-500">Tour Name</label>
                   <input
@@ -564,60 +621,101 @@ export default function TourManagement() {
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Start Date</label>
-                  <input
-                    type={formData.start_date ? "date" : "text"}
-                    onFocus={(e) => (e.target.type = "date")}
-                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
-                    name="start_date"
-                    placeholder="Start Date"
-                    value={formData.start_date}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="dd-mm-yyyy"
+                      maxLength={10}
+                      value={formData.start_date}
+                      onChange={(e) => handleDateChange(e, "start_date")}
+                      className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
+                      required
+                    />
+                    {/* Hidden Date Input for Picker */}
+                    <input
+                         type="date"
+                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                         id="picker-start_date"
+                         onChange={(e) => handlePickerChange(e, "start_date")}
+                    />
+                    <FiCalendar 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                        onClick={() => document.getElementById("picker-start_date")?.showPicker()} 
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">End Date</label>
-                  <input
-                    type={formData.end_date ? "date" : "text"}
-                    onFocus={(e) => (e.target.type = "date")}
-                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
-                    name="end_date"
-                    placeholder="End Date"
-                    value={formData.end_date}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="dd-mm-yyyy"
+                      maxLength={10}
+                      value={formData.end_date}
+                      onChange={(e) => handleDateChange(e, "end_date")}
+                      className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
+                      required
+                    />
+                    <input
+                         type="date"
+                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                         id="picker-end_date"
+                         onChange={(e) => handlePickerChange(e, "end_date")}
+                    />
+                    <FiCalendar 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                        onClick={() => document.getElementById("picker-end_date")?.showPicker()} 
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Arrival At</label>
-                  <input
-                    type={formData.arrival_at ? "date" : "text"}
-                    onFocus={(e) => (e.target.type = "date")}
-                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
-                    name="arrival_at"
-                    placeholder="Arrival At"
-                    value={formData.arrival_at}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="dd-mm-yyyy"
+                      maxLength={10}
+                      value={formData.arrival_at}
+                      onChange={(e) => handleDateChange(e, "arrival_at")}
+                      className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
+                    />
+                    <input
+                         type="date"
+                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                         id="picker-arrival_at"
+                         onChange={(e) => handlePickerChange(e, "arrival_at")}
+                    />
+                    <FiCalendar 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                        onClick={() => document.getElementById("picker-arrival_at")?.showPicker()} 
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Departure At</label>
-                  <input
-                    type={formData.depature_at ? "date" : "text"}
-                    onFocus={(e) => (e.target.type = "date")}
-                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
-                    name="depature_at"
-                    placeholder="Departure At"
-                    value={formData.depature_at}
-                    onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="dd-mm-yyyy"
+                      maxLength={10}
+                      value={formData.depature_at}
+                      onChange={(e) => handleDateChange(e, "depature_at")}
+                      className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
+                    />
+                    <input
+                         type="date"
+                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                         id="picker-depature_at"
+                         onChange={(e) => handlePickerChange(e, "depature_at")}
+                    />
+                    <FiCalendar 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                        onClick={() => document.getElementById("picker-depature_at")?.showPicker()} 
+                    />
+                  </div>
                 </div>
 
                 <div>

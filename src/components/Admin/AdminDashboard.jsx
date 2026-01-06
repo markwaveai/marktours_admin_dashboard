@@ -72,7 +72,7 @@ export default function AdminDashboard({ onLogout }) {
     { name: "Company-Paid (12th Month)", icon: Gift, component: <CompanyPaid />, disabled: true },
   ];
 
-  const shouldHideHeader = isSidebarOpen || isModalOpen;
+  const shouldHideHeader = isModalOpen;
 
   const ActiveComponent =
     menuItems.find((item) => item.name === activeTab)?.component ||

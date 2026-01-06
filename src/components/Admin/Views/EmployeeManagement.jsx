@@ -510,7 +510,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                             </div>
 
                             <div className="px-6 py-6 space-y-5 max-h-[65vh] overflow-y-auto scrollbar-hide">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div className="grid grid-cols-2 gap-5">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
                                             First Name <span className="text-red-500">*</span>
@@ -587,7 +587,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div className="grid grid-cols-2 gap-5">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-bold text-gray-600 ml-1 uppercase tracking-tight">
                                             Branch <span className="text-red-500">*</span>
