@@ -88,32 +88,32 @@ export default function AdminDashboard({ onLogout }) {
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 mx-4 transform scale-100 animate-in zoom-in-95 duration-200">
-             <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                   <LogOut className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  Are you sure you want to log out of the admin dashboard?
-                </p>
-                <div className="flex w-full gap-3">
-                  <button 
-                    onClick={() => setShowLogoutConfirm(false)}
-                    className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={() => {
-                        if (onLogout) onLogout();
-                        setShowLogoutConfirm(false);
-                    }}
-                    className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-200 transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
-             </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <LogOut className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to log out of the admin dashboard?
+              </p>
+              <div className="flex w-full gap-3">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (onLogout) onLogout();
+                    setShowLogoutConfirm(false);
+                  }}
+                  className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg shadow-red-200 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -230,7 +230,7 @@ export default function AdminDashboard({ onLogout }) {
             <h1 className="text-xl font-bold">{activeTab}</h1>
           </div>
 
-          <div className="text-right">
+          {/* <div className="text-right">
             <p className="text-[10px] text-gray-500 uppercase tracking-tighter">Today</p>
             <p className="text-xs sm:text-sm font-bold whitespace-nowrap">
               {new Date().toLocaleDateString("en-US", {
@@ -239,7 +239,7 @@ export default function AdminDashboard({ onLogout }) {
                 year: "numeric",
               })}
             </p>
-          </div>
+          </div> */}
         </header>
 
         {/* PAGE CONTENT */}

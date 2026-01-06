@@ -341,6 +341,45 @@ export default function UserManagement({ setIsModalOpen }) {
     }
   };
 
+  /* ================= STATUS UPDATE ================= */
+  const handleStatusUpdate = async (user, status) => {
+    const isConfirmed = await confirm({
+      title: `${status === 'Confirmed' ? 'Approve' : 'Reject'} User?`,
+      message: `Are you sure you want to mark this user as ${status}?`,
+      confirmText: status === 'Confirmed' ? "Approve" : "Reject",
+      type: status === 'Confirmed' ? "success" : "danger"
+    });
+
+    if (!isConfirmed) return;
+
+    const payload = {
+      ...user,
+      booking_status: status,
+      is_active: status === 'Confirmed', // Optionally auto-activate on confirm
+      // Ensure agent_id is a number
+      agent_id: user.agent_id ? Number(user.agent_id) : AGENT_ID
+    };
+
+    try {
+      const res = await fetch(`${BASE_URL}/user-details/${user.user_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        addToast(`User ${status} successfully`, "success");
+        refreshCurrentPage();
+      } else {
+        const err = await res.json();
+        addToast(`Failed: ${err.detail || "Update failed"}`, "error");
+      }
+    } catch (e) {
+      console.error("Status update error", e);
+      addToast("Failed to update status", "error");
+    }
+  };
+
   /* ================= DELETE ================= */
   const handleDelete = async (id) => {
     const isConfirmed = await confirm({
@@ -789,13 +828,13 @@ export default function UserManagement({ setIsModalOpen }) {
                       <td className="px-4 py-3 text-center">{u.branch}</td>
                       <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
                       <td className="px-4 py-3 text-center">{u.tour_code || "-"}</td>
-                      <td className="px-4 py-3 text-center">{u.emi_per_month || 0}</td>
-                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid || 0}</td>
-                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining || 0}</td>
+                      <td className="px-4 py-3 text-center">{u.emi_per_month || "-"}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid || "-"}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining || "-"}</td>
                       <td className="px-4 py-3 text-center">
-                         <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-yellow-800 bg-yellow-100'}`}>
-                            {u.booking_status || "Pending"}
-                         </span>
+                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-yellow-800 bg-yellow-100'}`}>
+                          {u.booking_status || "Pending"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center bg-gray-50">
                         <span className={`inline-flex px-2 text-xs font-semibold leading-5 text-green-800 bg-green-100 rounded-full
@@ -808,22 +847,20 @@ export default function UserManagement({ setIsModalOpen }) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEdit(u);
+                              handleStatusUpdate(u, "Confirmed");
                             }}
-                            className="p-1.5 text-blue-600 hover:text-blue-800 transition-colors"
-                            title="Edit User"
+                            className="bg-green-100 text-green-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-green-200 transition-colors"
                           >
-                            <FiEdit size={16} />
+                            Approve
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDelete(u.user_id);
+                              handleStatusUpdate(u, "Rejected");
                             }}
-                            className="p-1.5 text-red-500 hover:text-red-700 transition-colors"
-                            title="Delete User"
+                            className="bg-red-100 text-red-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-red-200 transition-colors"
                           >
-                            <FiTrash2 size={16} />
+                            Reject
                           </button>
                         </div>
                       </td>
