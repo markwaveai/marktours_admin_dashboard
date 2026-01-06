@@ -166,7 +166,7 @@ export default function DashboardHome() {
             User Status Distribution
           </h3>
 
-          <div className="h-[300px]">
+          <div className="h-[300px] select-none">
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={pieData} dataKey="value" innerRadius={75} outerRadius={100}>
@@ -189,7 +189,7 @@ export default function DashboardHome() {
             Risk Level Analysis
           </h3>
 
-          <div className="h-[300px]">
+          <div className="h-[300px] select-none">
             <ResponsiveContainer>
               <BarChart data={stackedRiskData} layout="vertical">
                 <XAxis type="number" />
@@ -209,7 +209,7 @@ export default function DashboardHome() {
             EMI Collection Trends
           </h3>
 
-          <div className="h-[300px]">
+          <div className="h-[300px] select-none">
             <ResponsiveContainer>
               <AreaChart data={emiProjectionData}>
                 <XAxis dataKey="month" />

@@ -77,7 +77,7 @@ export default function EMIPayments() {
         <div className="bg-white p-6 rounded-xl border">
           <h3 className="text-lg font-semibold mb-4">Daily Collections</h3>
 
-          <div className="h-[300px]">
+          <div className="h-[300px] select-none">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />

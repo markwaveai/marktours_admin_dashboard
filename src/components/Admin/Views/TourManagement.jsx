@@ -70,6 +70,12 @@ export default function TourManagement() {
     page_size: 9
   });
   const fetchingRef = useRef(null);
+  
+  // Local state for pagination input to allow free typing
+  const [pageInput, setPageInput] = useState(1);
+  useEffect(() => {
+    setPageInput(currentPage);
+  }, [currentPage]);
 
   const [formData, setFormData] = useState({
     id: null,
@@ -465,11 +471,24 @@ export default function TourManagement() {
               type="number"
               min="1"
               max={pagination.total_pages}
-              value={currentPage}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onBlur={() => {
+                const val = parseInt(pageInput);
                 if (!isNaN(val) && val >= 1 && val <= pagination.total_pages) {
                   setCurrentPage(val);
+                } else {
+                  setPageInput(currentPage);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = parseInt(pageInput);
+                  if (!isNaN(val) && val >= 1 && val <= pagination.total_pages) {
+                    setCurrentPage(val);
+                  } else {
+                    setPageInput(currentPage);
+                  }
                 }
               }}
               className="w-16 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
