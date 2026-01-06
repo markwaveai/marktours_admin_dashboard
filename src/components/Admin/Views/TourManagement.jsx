@@ -406,7 +406,7 @@ export default function TourManagement() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 mt-auto">
               <div className="border border-gray-300 bg-gray-50 rounded-lg py-1 text-center">
                 <p className="text-black text-[10px] tracking-wider">
                   BOOKED
@@ -498,7 +498,7 @@ export default function TourManagement() {
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="bg-white w-full max-w-md rounded-xl p-6"
+            className="bg-white w-[95%] sm:max-w-md rounded-xl p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold mb-4">
@@ -506,7 +506,7 @@ export default function TourManagement() {
             </h3>
 
             <form onSubmit={handleSaveTour} className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-gray-500">Tour Name</label>
                   <input
@@ -546,8 +546,11 @@ export default function TourManagement() {
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Start Date</label>
                   <input
-                    type="date"
+                    type={formData.start_date ? "date" : "text"}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                     name="start_date"
+                    placeholder="Start Date"
                     value={formData.start_date}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
@@ -558,8 +561,11 @@ export default function TourManagement() {
                 <div>
                   <label className="text-xs font-semibold text-gray-500">End Date</label>
                   <input
-                    type="date"
+                    type={formData.end_date ? "date" : "text"}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                     name="end_date"
+                    placeholder="End Date"
                     value={formData.end_date}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
@@ -570,8 +576,11 @@ export default function TourManagement() {
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Arrival At</label>
                   <input
-                    type="date"
+                    type={formData.arrival_at ? "date" : "text"}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                     name="arrival_at"
+                    placeholder="Arrival At"
                     value={formData.arrival_at}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
@@ -581,8 +590,11 @@ export default function TourManagement() {
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Departure At</label>
                   <input
-                    type="date"
+                    type={formData.depature_at ? "date" : "text"}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                     name="depature_at"
+                    placeholder="Departure At"
                     value={formData.depature_at}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
@@ -651,19 +663,17 @@ export default function TourManagement() {
                   />
                 </div>
 
-                {isEdit && (
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500">Available Slots</label>
-                    <input
-                      type="number"
-                      name="available_slots"
-                      placeholder="Available Slots"
-                      value={formData.available_slots}
-                      onChange={handleChange}
-                      className="w-full border rounded-lg p-2 text-sm"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Available Slots</label>
+                  <input
+                    type="number"
+                    name="available_slots"
+                    placeholder="Available Slots"
+                    value={formData.available_slots}
+                    onChange={handleChange}
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
 
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-gray-500">Image URL</label>

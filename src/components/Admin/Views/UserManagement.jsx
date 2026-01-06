@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FiEdit, FiTrash2, FiSearch, FiX } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
@@ -38,6 +38,16 @@ export default function UserManagement({ setIsModalOpen }) {
     page_size: 15
   });
 
+  const [copiedId, setCopiedId] = useState(null); // 'ID-FIELD_NAME'
+
+  const copyToClipboard = (text, id) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    // addToast("Copied to clipboard!", "success"); // Optional if we have the tick
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const [usersData, setUsersData] = useState([]);
   const [search, setSearch] = useState("");
 
@@ -55,10 +65,21 @@ export default function UserManagement({ setIsModalOpen }) {
   }, [showForm, setIsModalOpen]);
 
   // Agent Search State
+  const [agentsList, setAgentsList] = useState([]);
+  const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
 
   // Extra Details Management State
   const [showExtraForm, setShowExtraForm] = useState(false);
   const [originalExtraDetail, setOriginalExtraDetail] = useState(null);
+  const [visibleTravellerMobiles, setVisibleTravellerMobiles] = useState({}); // { [id]: boolean }
+
+  const toggleTravellerMobile = (id) => {
+    setVisibleTravellerMobiles(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   const emptyExtraForm = {
     user_id: null,
     mobile: "",
@@ -85,20 +106,20 @@ export default function UserManagement({ setIsModalOpen }) {
 
   useEffect(() => {
     const fetchAgents = async () => {
-      // Check session storage first to avoid repetitive API calls
+      // Check session storage first
       const cachedAgents = sessionStorage.getItem("agentsList");
-
-      // We can still fetch in background to update, or just rely on cache.
-      // To strictly "minimize", we rely on cache and maybe refresh only if empty.
-      if (!cachedAgents) {
-        try {
-          const res = await fetch(`${BASE_URL}/agents`);
-          const data = await res.json();
-          if (data.agents) {
-            sessionStorage.setItem("agentsList", JSON.stringify(data.agents));
-          }
-        } catch (e) { console.error("Failed to fetch agents", e); }
+      if (cachedAgents) {
+        setAgentsList(JSON.parse(cachedAgents));
       }
+
+      try {
+        const res = await fetch(`${BASE_URL}/agents`);
+        const data = await res.json();
+        if (data.agents) {
+          sessionStorage.setItem("agentsList", JSON.stringify(data.agents));
+          setAgentsList(data.agents);
+        }
+      } catch (e) { console.error("Failed to fetch agents", e); }
     };
     fetchAgents();
   }, []);
@@ -121,6 +142,12 @@ export default function UserManagement({ setIsModalOpen }) {
 
   const [form, setForm] = useState(emptyForm);
   const [viewImg, setViewImg] = useState(null);
+  const [imgLoading, setImgLoading] = useState(false);
+
+  // Branch Suggestions
+  const [showBranchSuggestions, setShowBranchSuggestions] = useState(false);
+  const uniqueBranches = ["Mumbai Branch", "Delhi Branch", "Chennai Branch", "Hyderabad Branch"];
+
   useEffect(() => {
     if (viewImg) {
       // Image viewing logic if needed
@@ -407,8 +434,8 @@ export default function UserManagement({ setIsModalOpen }) {
 
       {/* ================= ADD / EDIT MODAL ================= */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowForm(false)}>
-          <div className="bg-white w-[420px] rounded-xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-white w-full max-w-[420px] rounded-xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between mb-4">
               <h3 className="text-lg font-bold">
                 {originalUser ? "Edit User" : "Add User"}
@@ -418,8 +445,46 @@ export default function UserManagement({ setIsModalOpen }) {
               </button>
             </div>
 
+            {/* Agent ID with Suggestions */}
+            <div className="mb-3 relative">
+              <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Agent ID</label>
+              <input
+                type="text"
+                placeholder="Enter or Select Agent ID"
+                value={form.agent_id}
+                onChange={(e) => {
+                  setForm({ ...form, agent_id: e.target.value });
+                  setShowAgentSuggestions(true);
+                }}
+                onFocus={() => setShowAgentSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowAgentSuggestions(false), 200)}
+                className="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+              />
+              {showAgentSuggestions && (
+                <ul className="absolute z-50 bg-white border border-gray-200 w-full max-h-48 overflow-y-auto rounded-md shadow-lg mt-1">
+                  {agentsList
+                    .filter((agent) =>
+                      String(agent.agent_id).includes(form.agent_id) ||
+                      agent.name.toLowerCase().includes(String(form.agent_id).toLowerCase())
+                    )
+                    .map((agent) => (
+                      <li
+                        key={agent.agent_id}
+                        className="px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer text-gray-700"
+                        onClick={() => setForm({ ...form, agent_id: agent.agent_id })}
+                      >
+                        <span className="font-semibold text-indigo-600">{agent.agent_id}</span> - {agent.name}
+                      </li>
+                    ))}
+                  {agentsList.length === 0 && (
+                    <li className="px-3 py-2 text-sm text-gray-400">No agents found</li>
+                  )}
+                </ul>
+              )}
+            </div>
+
             {/* Name Fields */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">First Name</label>
                 <input
@@ -453,7 +518,7 @@ export default function UserManagement({ setIsModalOpen }) {
             </div>
 
             {/* Mobile & Branch */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Mobile</label>
                 <input
@@ -472,12 +537,37 @@ export default function UserManagement({ setIsModalOpen }) {
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Branch</label>
-                <input
-                  placeholder="Branch Name"
-                  value={form.branch}
-                  onChange={(e) => setForm({ ...form, branch: e.target.value })}
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                />
+                <div className="relative">
+                  <input
+                    placeholder="Branch Name"
+                    value={form.branch}
+                    onChange={(e) => {
+                      setForm({ ...form, branch: e.target.value });
+                      setShowBranchSuggestions(true);
+                    }}
+                    onFocus={() => setShowBranchSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowBranchSuggestions(false), 200)}
+                    className="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                  />
+                  {showBranchSuggestions && (
+                    <ul className="absolute z-50 bg-white border border-gray-200 w-full max-h-48 overflow-y-auto rounded-md shadow-lg mt-1">
+                      {uniqueBranches
+                        .filter((b) => b.toLowerCase().includes((form.branch || "").toLowerCase()))
+                        .map((b, i) => (
+                          <li
+                            key={i}
+                            className="px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer text-gray-700"
+                            onClick={() => setForm({ ...form, branch: b })}
+                          >
+                            {b}
+                          </li>
+                        ))}
+                      {uniqueBranches.filter((b) => b.toLowerCase().includes((form.branch || "").toLowerCase())).length === 0 && (
+                        <li className="px-3 py-2 text-sm text-gray-400">No branches found</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -492,11 +582,13 @@ export default function UserManagement({ setIsModalOpen }) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wide font-semibold">Date of Birth</label>
                 <input
-                  type="date"
+                  type={form.dob ? "date" : "text"}
+                  onFocus={(e) => (e.target.type = "date")}
+                  onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                   value={form.dob}
                   onChange={(e) => setForm({ ...form, dob: e.target.value })}
                   className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
@@ -508,7 +600,12 @@ export default function UserManagement({ setIsModalOpen }) {
                 <input
                   type="text"
                   value={form.pincode}
-                  onChange={(e) => setForm({ ...form, pincode: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^\d{0,6}$/.test(val)) {
+                      setForm({ ...form, pincode: val });
+                    }
+                  }}
                   className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
@@ -656,6 +753,7 @@ export default function UserManagement({ setIsModalOpen }) {
               <thead className="bg-gray-100/50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">S.No</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Agent ID</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Name</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Email</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Mobile</th>
@@ -674,6 +772,7 @@ export default function UserManagement({ setIsModalOpen }) {
                   `}
                     >
                       <td className="px-4 py-3 text-center">{(currentPage - 1) * pagination.page_size + i + 1}</td>
+                      <td className="px-4 py-3 text-center font-mono text-gray-600">{u.agent_id || "N/A"}</td>
                       <td className="px-4 py-3 text-center">{u.name}</td>
                       <td className="px-4 py-3 text-center">{u.email}</td>
                       <td className="px-4 py-3 text-center">{u.mobile}</td>
@@ -713,7 +812,7 @@ export default function UserManagement({ setIsModalOpen }) {
                     {/* ================= EXTRA DETAILS ================= */}
                     {expandedUserId === u.user_id && (
                       <tr>
-                        <td colSpan="7" className="p-0 border-b">
+                        <td colSpan="8" className="p-0 border-b">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
                             {extraLoading ? (
                               <SkeletonLoader type="table" count={5} />
@@ -755,7 +854,21 @@ export default function UserManagement({ setIsModalOpen }) {
                                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Personal Info</h5>
                                           <div className="space-y-2">
                                             <div><label className="text-xs text-gray-500">Full Name</label><p className="text-sm font-medium text-gray-900">{d.name} {d.surname}</p></div>
-                                            <div><label className="text-xs text-gray-500">Mobile</label><p className="text-sm font-medium text-gray-900">{maskMobile(d.mobile)}</p></div>
+                                            <div>
+                                              <label className="text-xs text-gray-500">Mobile</label>
+                                              <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-gray-900">
+                                                  {visibleTravellerMobiles[d.id] ? d.mobile : maskMobile(d.mobile)}
+                                                </p>
+                                                <button
+                                                  onClick={() => toggleTravellerMobile(d.id)}
+                                                  className="text-gray-400 hover:text-indigo-600 transition-colors"
+                                                  title={visibleTravellerMobiles[d.id] ? "Hide Number" : "Show Number"}
+                                                >
+                                                  {visibleTravellerMobiles[d.id] ? <FiEyeOff size={14} /> : <FiEye size={14} />}
+                                                </button>
+                                              </div>
+                                            </div>
                                             <div><label className="text-xs text-gray-500">Date of Birth</label><p className="text-sm font-medium text-gray-900">{d.dob || 'N/A'}</p></div>
                                             <div><label className="text-xs text-gray-500">Gender</label><p className="text-sm font-medium text-gray-900">{d.gender || 'N/A'}</p></div>
                                             <div><label className="text-xs text-gray-500">Nationality</label><p className="text-sm font-medium text-gray-900">{d.nationality || 'N/A'}</p></div>
@@ -765,7 +878,20 @@ export default function UserManagement({ setIsModalOpen }) {
                                         <div className="space-y-3">
                                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Passport Details</h5>
                                           <div className="space-y-2">
-                                            <div><label className="text-xs text-gray-500">Passport Number</label><p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p></div>
+                                            <div><label className="text-xs text-gray-500">Passport Number</label>
+                                              <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-gray-900">{d.passportno || 'N/A'}</p>
+                                                {d.passportno && (
+                                                  <button
+                                                    onClick={() => copyToClipboard(d.passportno, `${d.id}-passport`)}
+                                                    className={`transition-colors ${copiedId === `${d.id}-passport` ? "text-green-600" : "text-gray-400 hover:text-indigo-600"}`}
+                                                    title="Copy Passport Number"
+                                                  >
+                                                    {copiedId === `${d.id}-passport` ? <FiCheck size={14} /> : <FiCopy size={12} />}
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
                                             <div><label className="text-xs text-gray-500">Issued By</label><p className="text-sm font-medium text-gray-900">{d.issuedby || 'N/A'}</p></div>
                                             <div><label className="text-xs text-gray-500">Date of Issue</label><p className="text-sm font-medium text-gray-900">{d.dateofissued || 'N/A'}</p></div>
                                             <div><label className="text-xs text-gray-500">Date of Expiry</label><p className="text-sm font-medium text-gray-900">{d.dateofexpired || 'N/A'}</p></div>
@@ -775,17 +901,30 @@ export default function UserManagement({ setIsModalOpen }) {
                                         <div className="space-y-3">
                                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b pb-2">Tour & Documents</h5>
                                           <div className="space-y-2">
-                                            <div><label className="text-xs text-gray-500">Tour Code</label><p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p></div>
+                                            <div><label className="text-xs text-gray-500">Tour Code</label>
+                                              <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-indigo-600">{d.tour_code || 'N/A'}</p>
+                                                {d.tour_code && (
+                                                  <button
+                                                    onClick={() => copyToClipboard(d.tour_code, `${d.id}-tour`)}
+                                                    className={`transition-colors ${copiedId === `${d.id}-tour` ? "text-green-600" : "text-gray-400 hover:text-indigo-600"}`}
+                                                    title="Copy Tour Code"
+                                                  >
+                                                    {copiedId === `${d.id}-tour` ? <FiCheck size={14} /> : <FiCopy size={12} />}
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
                                             <div><label className="text-xs text-gray-500">Created At</label><p className="text-sm font-medium text-gray-900">{new Date(d.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p></div>
                                           </div>
                                           {/* Document Links */}
                                           <div className="pt-3 space-y-2">
                                             <label className="text-xs text-gray-500 block">Documents</label>
                                             <div className="grid grid-cols-2 gap-2">
-                                              {d.passport_image_url && (<button onClick={() => setViewImg(d.passport_image_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Passport</button>)}
-                                              {d.aadhar_front_url && (<button onClick={() => setViewImg(d.aadhar_front_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Front</button>)}
-                                              {d.aadhar_back_url && (<button onClick={() => setViewImg(d.aadhar_back_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Back</button>)}
-                                              {d.pancard_url && (<button onClick={() => setViewImg(d.pancard_url)} className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>PAN</button>)}
+                                              {d.passport_image_url && (<button onClick={() => { setViewImg(d.passport_image_url); setImgLoading(true); }} className="flex items-center justify-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Passport</button>)}
+                                              {d.aadhar_front_url && (<button onClick={() => { setViewImg(d.aadhar_front_url); setImgLoading(true); }} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Front</button>)}
+                                              {d.aadhar_back_url && (<button onClick={() => { setViewImg(d.aadhar_back_url); setImgLoading(true); }} className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Aadhar Back</button>)}
+                                              {d.pancard_url && (<button onClick={() => { setViewImg(d.pancard_url); setImgLoading(true); }} className="flex items-center justify-center gap-1 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>PAN</button>)}
                                             </div>
                                           </div>
                                         </div>
@@ -860,6 +999,41 @@ export default function UserManagement({ setIsModalOpen }) {
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
 
           {/* ================= EXTRA DETAILS MODAL ================= */}
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {viewImg && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewImg(null)}>
+          <div className="relative w-[40%] h-1/2 bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden transition-all" onClick={e => e.stopPropagation()}>
+            <div className="absolute top-2 right-2 z-10">
+              <button
+                onClick={() => setViewImg(null)}
+                className="bg-black/50 text-white hover:bg-black/70 rounded-full p-2 transition-colors"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            <div className="flex-1 w-full h-full bg-gray-100 flex items-center justify-center overflow-hidden relative">
+              {imgLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-0">
+                  <FiLoader className="animate-spin text-indigo-600 mb-2" size={32} />
+                  <p className="text-xs font-medium text-gray-400">Loading Image...</p>
+                </div>
+              )}
+              <img
+                src={viewImg}
+                alt="Preview"
+                onLoad={() => setImgLoading(false)}
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
+                onError={(e) => {
+                  setImgLoading(false);
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="text-center p-4"> <p class="font-bold text-gray-500 mb-2">Preview Failed</p> <a href="' + viewImg + '" target="_blank" class="text-indigo-600 underline text-sm">Open in New Tab</a> </div>';
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
