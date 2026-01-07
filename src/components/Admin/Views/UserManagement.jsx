@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle, FiArrowUp, FiArrowDown } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
@@ -61,6 +61,28 @@ export default function UserManagement({ setIsModalOpen }) {
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [extraDetails, setExtraDetails] = useState([]);
   const [extraLoading, setExtraLoading] = useState(false);
+
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState({ key: 'user_id', direction: 'desc' });
+
+  const handleSort = (key) => {
+    if (sortConfig.key !== key) {
+      setSortConfig({ key, direction: 'asc' });
+    } else if (sortConfig.direction === 'asc') {
+      setSortConfig({ key, direction: 'desc' });
+    } else {
+      setSortConfig({ key: null, direction: null });
+    }
+  };
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey || !sortConfig.direction) {
+      return <FiArrowUp className="opacity-0 group-hover:opacity-40 ml-1 transition-opacity" size={14} />;
+    }
+    return sortConfig.direction === 'asc'
+      ? <FiArrowUp className="text-indigo-600 ml-1" size={14} />
+      : <FiArrowDown className="text-indigo-600 ml-1" size={14} />;
+  };
 
   const [showForm, setShowForm] = useState(false);
   const [originalUser, setOriginalUser] = useState(null);
@@ -248,17 +270,36 @@ export default function UserManagement({ setIsModalOpen }) {
 
     let matchesStatus = true;
     if (statusFilter !== "All") {
-       const status = u.booking_status || "Pending";
-       if (statusFilter === "Approved") {
-          matchesStatus = status === "Confirmed";
-       } else if (statusFilter === "Pending") {
-          matchesStatus = status === "Pending";
-       } else if (statusFilter === "Rejected") {
-          matchesStatus = status === "Rejected" || status === "Cancelled";
-       }
+      const status = u.booking_status || "Pending";
+      if (statusFilter === "Approved") {
+        matchesStatus = status === "Confirmed";
+      } else if (statusFilter === "Pending") {
+        matchesStatus = status === "Pending";
+      } else if (statusFilter === "Rejected") {
+        matchesStatus = status === "Rejected" || status === "Cancelled";
+      }
     }
 
     return matchesSearch && matchesStatus;
+  });
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    if (!sortConfig.key || !sortConfig.direction) return 0;
+
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+
+    // Handle nulls/undefined
+    if (aVal === null || aVal === undefined) aVal = '';
+    if (bVal === null || bVal === undefined) bVal = '';
+
+    if (aVal < bVal) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (aVal > bVal) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
   });
 
   /* ================= ROW CLICK ================= */
@@ -781,36 +822,36 @@ export default function UserManagement({ setIsModalOpen }) {
       {activeTab === "User Management" ? (
         <div className="flex flex-col">
           {/* Header */}
-          <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 mt-2">
+          <div className="sticky top-0 z-50 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 mt-2 shadow-sm">
             <div className="flex flex-col gap-4 w-[96vw] sm:w-auto p-4 sm:p-0 -mb-5 sm:mb-0 -mt-5 sm:mt-0">
               {/* <h2 className="text-lg font-bold text-gray-900">Traveller Assessment</h2> */}
               {/* Status Filter Boxes */}
               <div className="flex gap-2 sm:gap-4 w-full overflow-x-auto no-scrollbar">
-                 {["All", "Pending", "Approved", "Rejected"].map((status) => {
-                    const iconMap = {
-                      "All": <FiList size={16} />,
-                      "Pending": <FiClock size={16} />,
-                      "Approved": <FiCheckCircle size={16} />,
-                      "Rejected": <FiXCircle size={16} />
-                    };
+                {["All", "Pending", "Approved", "Rejected"].map((status) => {
+                  const iconMap = {
+                    "All": <FiList size={16} />,
+                    "Pending": <FiClock size={16} />,
+                    "Approved": <FiCheckCircle size={16} />,
+                    "Rejected": <FiXCircle size={16} />
+                  };
 
-                    const activeColorMap = {
-                      "All": "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200",
-                      "Pending": "bg-amber-50 text-amber-700 border-amber-200 ring-1 ring-amber-200",
-                      "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-200",
-                      "Rejected": "bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-200"
-                    };
+                  const activeColorMap = {
+                    "All": "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200",
+                    "Pending": "bg-amber-50 text-amber-700 border-amber-200 ring-1 ring-amber-200",
+                    "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-200",
+                    "Rejected": "bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-200"
+                  };
 
-                    return (
-                    <div 
+                  return (
+                    <div
                       key={status}
                       onClick={() => setStatusFilter(status)}
                       className={`
                         px-4 py-2 sm:px-4 sm:py-3 rounded-lg border cursor-pointer transition-all shadow-sm flex items-center justify-center font-semibold text-sm gap-2
                         min-w-[100px] sm:min-w-[120px] text-center whitespace-nowrap flex-shrink-0
-                        ${statusFilter === status 
-                           ? activeColorMap[status]
-                           : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-gray-50"}
+                        ${statusFilter === status
+                          ? activeColorMap[status]
+                          : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-gray-50"}
                       `}
                     >
                       {iconMap[status]}
@@ -820,7 +861,8 @@ export default function UserManagement({ setIsModalOpen }) {
                         ${statusFilter === status ? "bg-white/20" : "bg-gray-100 text-gray-500"}
                       `}>{status === "All" ? pagination.total_records : 0}</span>
                     </div>
-                 )})}
+                  )
+                })}
               </div>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -847,39 +889,66 @@ export default function UserManagement({ setIsModalOpen }) {
 
           {/* ================= TABLE WRAPPER ================= */}
           <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 border-b sticky top-0 z-20">
-                <tr>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">S.No</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Agent ID</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Name</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Email</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Mobile</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Branch</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[200px]">Tour Name</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Tour Code</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">EMI / Month</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Paid</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Remaining</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Booking Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Action</th>
+            <table className="w-full text-sm border-separate border-spacing-0">
+              <thead className="sticky top-0 z-40 bg-gray-100">
+                <tr className="bg-gray-100">
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-0 z-40 bg-gray-100 min-w-[60px] border-b border-gray-200">
+                    S.No
+                  </th>
+                  <th onClick={() => handleSort('name')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[60px] z-40 bg-gray-100 min-w-[150px] border-b border-gray-200 cursor-pointer group">
+                    <div className="flex items-center justify-center">Name <SortIcon columnKey="name" /></div>
+                  </th>
+                  <th onClick={() => handleSort('mobile')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[210px] z-40 bg-gray-100 min-w-[130px] border-b border-r border-gray-200 cursor-pointer group">
+                    <div className="flex items-center justify-center">Mobile <SortIcon columnKey="mobile" /></div>
+                  </th>
+                  <th onClick={() => handleSort('agent_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Agent ID <SortIcon columnKey="agent_id" /></div>
+                  </th>
+                  <th onClick={() => handleSort('email')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Email <SortIcon columnKey="email" /></div>
+                  </th>
+                  <th onClick={() => handleSort('branch')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Branch <SortIcon columnKey="branch" /></div>
+                  </th>
+                  <th onClick={() => handleSort('tour_name')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[200px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Tour Name <SortIcon columnKey="tour_name" /></div>
+                  </th>
+                  <th onClick={() => handleSort('tour_code')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Tour Code <SortIcon columnKey="tour_code" /></div>
+                  </th>
+                  <th onClick={() => handleSort('emi_per_month')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">EMI / Month <SortIcon columnKey="emi_per_month" /></div>
+                  </th>
+                  <th onClick={() => handleSort('amount_paid')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Paid <SortIcon columnKey="amount_paid" /></div>
+                  </th>
+                  <th onClick={() => handleSort('amount_remaining')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Remaining <SortIcon columnKey="amount_remaining" /></div>
+                  </th>
+                  <th onClick={() => handleSort('booking_status')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Booking Status <SortIcon columnKey="booking_status" /></div>
+                  </th>
+                  <th onClick={() => handleSort('is_active')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Status <SortIcon columnKey="is_active" /></div>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((u, i) => (
+                {sortedUsers.map((u, i) => (
                   <React.Fragment key={u.user_id}>
                     <tr
                       onClick={() => toggleRow(u)}
-                      className={`cursor-pointer transition-colors text-sm
-                    ${expandedUserId === u.user_id ? "bg-blue-50" : "hover:bg-gray-50"}
+                      className={`cursor-pointer transition-colors text-sm group
+                    ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white hover:bg-gray-50"}
                   `}
                     >
-                      <td className="px-4 py-3 text-center">{(currentPage - 1) * pagination.page_size + i + 1}</td>
-                      <td className="px-4 py-3 text-center font-mono text-gray-600">{u.agent_id || "N/A"}</td>
-                      <td className="px-4 py-3 text-center">{u.name}</td>
-                      <td className="px-4 py-3 text-center">{u.email}</td>
-                      <td className="px-4 py-3 text-center">{u.mobile}</td>
+                      <td className={`px-4 py-3 text-center sm:sticky left-0 z-10 min-w-[60px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{(currentPage - 1) * pagination.page_size + i + 1}</td>
+                      <td className={`px-4 py-3 text-center sm:sticky left-[60px] z-10 min-w-[150px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.name}</td>
+                      <td className={`px-4 py-3 text-center sm:sticky left-[210px] z-10 min-w-[130px] border-b border-r border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.mobile}</td>
+                      <td className="px-4 py-3 text-center font-mono text-gray-600 border-b border-gray-100">{u.agent_id || "N/A"}</td>
+                      <td className="px-4 py-3 text-center border-b border-gray-100">{u.email}</td>
+
                       <td className="px-4 py-3 text-center">{u.branch}</td>
                       <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
                       <td className="px-4 py-3 text-center">{u.tour_code || "-"}</td>
@@ -887,7 +956,7 @@ export default function UserManagement({ setIsModalOpen }) {
                       <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid || "-"}</td>
                       <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining || "-"}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-yellow-800 bg-yellow-100'}`}>
+                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-orange-500 bg-yellow-100'}`}>
                           {u.booking_status || "Pending"}
                         </span>
                       </td>
@@ -924,7 +993,7 @@ export default function UserManagement({ setIsModalOpen }) {
                     {/* ================= EXTRA DETAILS ================= */}
                     {expandedUserId === u.user_id && (
                       <tr>
-                        <td colSpan="12" className="p-0 border-b">
+                        <td colSpan="14" className="p-0 border-b">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
                             {extraLoading ? (
                               <SkeletonLoader type="table" count={5} />

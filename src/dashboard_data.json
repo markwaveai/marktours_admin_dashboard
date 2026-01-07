@@ -1,0 +1,73 @@
+{
+  "totalUsers": 12543,
+  "emiCollectionPercentage": 85.4,
+  "overallPerformance": 92.8,
+  "agentLeadBoard": [
+    { "name": "Rajesh Kumar", "usersCount": 450 },
+    { "name": "Sara Johnson", "usersCount": 425 },
+    { "name": "Amit Shah", "usersCount": 400 },
+    { "name": "Elena Perez", "usersCount": 380 },
+    { "name": "Kenji Sato", "usersCount": 350 }
+  ],
+  "tourOccupancy": [
+    { "tourName": "Swiss Alps Explorer", "percentage": 98 },
+    { "tourName": "Tokyo Night Life", "percentage": 92 },
+    { "tourName": "Bali Beach Retreat", "percentage": 88 },
+    { "tourName": "Safari Adventure", "percentage": 85 },
+    { "tourName": "Grand Canyon Trek", "percentage": 80 }
+  ],
+  "mostVisitedPlaces": [
+    { "place": "Paris", "visits": 1200 },
+    { "place": "New York", "visits": 1100 },
+    { "place": "Dubai", "visits": 950 },
+    { "place": "London", "visits": 900 },
+    { "place": "Rome", "visits": 850 }
+  ],
+  "tourMaps": [
+    { "id": 1, "name": "Europe Route", "coords": [48.8566, 2.3522] },
+    { "id": 2, "name": "USA Route", "coords": [40.7128, -74.0060] }
+  ],
+  "feedbacks": [
+    { "userName": "John Doe", "feedback": "Amazing experience, very well organized.", "rating": 5, "satisfactionScore": 95 },
+    { "userName": "Jane Smith", "feedback": "Great service but the flights were a bit long.", "rating": 4, "satisfactionScore": 85 },
+    { "userName": "Michael Chen", "feedback": "Top notch hotels and guides.", "rating": 5, "satisfactionScore": 98 }
+  ],
+  "ratingsAndSatisfaction": {
+    "averageRating": 4.7,
+    "satisfactionPercentage": 91.5
+  },
+  "monthlyReport": [
+    {"month": "Jan", "users": 1000, "revenue": 50000},
+    {"month": "Feb", "users": 1200, "revenue": 62000},
+    {"month": "Mar", "users": 1100, "revenue": 58000},
+    {"month": "Apr", "users": 1500, "revenue": 75000},
+    {"month": "May", "users": 1800, "revenue": 90000},
+    {"month": "Jun", "users": 2000, "revenue": 110000}
+  ],
+  "dailyActivity": [
+    {"date": "2026-01-01", "activeUsers": 450},
+    {"date": "2026-01-02", "activeUsers": 480},
+    {"date": "2026-01-03", "activeUsers": 520},
+    {"date": "2026-01-04", "activeUsers": 500},
+    {"date": "2026-01-05", "activeUsers": 550},
+    {"date": "2026-01-06", "activeUsers": 600},
+    {"date": "2026-01-07", "activeUsers": 580}
+  ],
+  "branchRank": [
+    { "branchName": "Mumbai Central", "userCount": 2500 },
+    { "branchName": "Delhi North", "userCount": 2100 },
+    { "branchName": "Bangalore East", "userCount": 1900 },
+    { "branchName": "Chennai South", "userCount": 1700 },
+    { "branchName": "Kolkata West", "userCount": 1500 }
+  ],
+  "trendingPlaces": [
+    { "place": "Iceland", "expectedTours": 15 },
+    { "place": "Japan", "expectedTours": 12 },
+    { "place": "Morocco", "expectedTours": 10 }
+  ],
+  "upcomingTours": [
+    { "tourName": "Aurora Watch", "date": "2026-02-15", "bookings": 45 },
+    { "tourName": "Cherry Blossom Tour", "date": "2026-03-20", "bookings": 60 },
+    { "tourName": "Amazon Rainforest", "date": "2026-04-10", "bookings": 30 }
+  ]
+}
