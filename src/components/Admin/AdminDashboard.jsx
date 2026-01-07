@@ -28,7 +28,9 @@ import TourAssignment from "./Views/TourAssignment";
 
 
 import CustomerInterested from "./Views/CustomerInterested";
-import DetailsTab from "./Views/DetailsTab";
+// import DetailsTab from "./Views/DetailsTab"; // Removed as requested
+import UserManagement from "./Views/UserManagement";
+import EmployeeManagement from "./Views/EmployeeManagement";
 
 export default function AdminDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState(() => {
@@ -59,7 +61,8 @@ export default function AdminDashboard({ onLogout }) {
 
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, component: <DashboardHome /> },
-    { name: "Details", icon: Users, component: <DetailsTab /> },
+    { name: "User Management", icon: Users, component: <UserManagement /> },
+    { name: "Employee Management", icon: Users, component: <EmployeeManagement /> },
     { name: "Tour Management", icon: Plane, component: <TourManagement /> },
     { name: "Customer Interested", icon: Users, component: <CustomerInterested /> },
 
@@ -243,8 +246,8 @@ export default function AdminDashboard({ onLogout }) {
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="overflow-y-auto scrollbar-hide bg-gray-50 flex-1">
-          <div className="w-full px-4 pb-4">
+        <main className="overflow-y-auto scrollbar-hide bg-gray-50 w-screen">
+          <div className="w-screen sm:px-4 pb-4 px-1">
             {React.cloneElement(ActiveComponent, { setIsModalOpen })}
           </div>
         </main>

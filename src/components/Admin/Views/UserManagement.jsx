@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
@@ -56,6 +56,7 @@ export default function UserManagement({ setIsModalOpen }) {
 
   const [usersData, setUsersData] = useState([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All"); // All, Pending, Approved, Rejected
 
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [extraDetails, setExtraDetails] = useState([]);
@@ -239,11 +240,25 @@ export default function UserManagement({ setIsModalOpen }) {
   /* ================= FILTER LOGIC ================= */
   const filteredUsers = usersData.filter((u) => {
     const s = search.toLowerCase();
-    return (
+    const matchesSearch = (
       (u.name && u.name.toLowerCase().includes(s)) ||
       (u.email && u.email.toLowerCase().includes(s)) ||
       (u.mobile && String(u.mobile).includes(s))
     );
+
+    let matchesStatus = true;
+    if (statusFilter !== "All") {
+       const status = u.booking_status || "Pending";
+       if (statusFilter === "Approved") {
+          matchesStatus = status === "Confirmed";
+       } else if (statusFilter === "Pending") {
+          matchesStatus = status === "Pending";
+       } else if (statusFilter === "Rejected") {
+          matchesStatus = status === "Rejected" || status === "Cancelled";
+       }
+    }
+
+    return matchesSearch && matchesStatus;
   });
 
   /* ================= ROW CLICK ================= */
@@ -766,8 +781,48 @@ export default function UserManagement({ setIsModalOpen }) {
       {activeTab === "User Management" ? (
         <div className="flex flex-col">
           {/* Header */}
-          <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
-            <h2 className="text-lg font-bold text-gray-900">Traveller Assessment</h2>
+          <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 mt-2">
+            <div className="flex flex-col gap-4 w-[96vw] sm:w-auto p-4 sm:p-0 -mb-5 sm:mb-0 -mt-5 sm:mt-0">
+              {/* <h2 className="text-lg font-bold text-gray-900">Traveller Assessment</h2> */}
+              {/* Status Filter Boxes */}
+              <div className="flex gap-2 sm:gap-4 w-full overflow-x-auto no-scrollbar">
+                 {["All", "Pending", "Approved", "Rejected"].map((status) => {
+                    const iconMap = {
+                      "All": <FiList size={16} />,
+                      "Pending": <FiClock size={16} />,
+                      "Approved": <FiCheckCircle size={16} />,
+                      "Rejected": <FiXCircle size={16} />
+                    };
+
+                    const activeColorMap = {
+                      "All": "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200",
+                      "Pending": "bg-amber-50 text-amber-700 border-amber-200 ring-1 ring-amber-200",
+                      "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-200",
+                      "Rejected": "bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-200"
+                    };
+
+                    return (
+                    <div 
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={`
+                        px-4 py-2 sm:px-4 sm:py-3 rounded-lg border cursor-pointer transition-all shadow-sm flex items-center justify-center font-semibold text-sm gap-2
+                        min-w-[100px] sm:min-w-[120px] text-center whitespace-nowrap flex-shrink-0
+                        ${statusFilter === status 
+                           ? activeColorMap[status]
+                           : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-gray-50"}
+                      `}
+                    >
+                      {iconMap[status]}
+                      <span>{status}</span>
+                      <span className={`
+                        text-base px-2 py-0.5 rounded-full ml-1
+                        ${statusFilter === status ? "bg-white/20" : "bg-gray-100 text-gray-500"}
+                      `}>{status === "All" ? pagination.total_records : 0}</span>
+                    </div>
+                 )})}
+              </div>
+            </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
                 <FiSearch
@@ -791,9 +846,9 @@ export default function UserManagement({ setIsModalOpen }) {
           </div>
 
           {/* ================= TABLE WRAPPER ================= */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-sm">
-              <thead className="bg-gray-100/50 border-b">
+              <thead className="bg-gray-100 border-b sticky top-0 z-20">
                 <tr>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">S.No</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Agent ID</th>
@@ -808,7 +863,7 @@ export default function UserManagement({ setIsModalOpen }) {
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Remaining</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Booking Status</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Actions</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase min-w-[100px]">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -869,7 +924,7 @@ export default function UserManagement({ setIsModalOpen }) {
                     {/* ================= EXTRA DETAILS ================= */}
                     {expandedUserId === u.user_id && (
                       <tr>
-                        <td colSpan="14" className="p-0 border-b">
+                        <td colSpan="12" className="p-0 border-b">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
                             {extraLoading ? (
                               <SkeletonLoader type="table" count={5} />
