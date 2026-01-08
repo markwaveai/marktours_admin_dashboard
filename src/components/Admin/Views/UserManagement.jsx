@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle, FiArrowUp, FiArrowDown } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle, FiArrowUp, FiArrowDown, FiFilter } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
@@ -16,7 +16,7 @@ const maskMobile = (mobile) => {
 };
 
 // export default function UserManagement() {
-export default function UserManagement({ setIsModalOpen }) {
+export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const { addToast } = useToast();
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
@@ -57,6 +57,52 @@ export default function UserManagement({ setIsModalOpen }) {
   const [usersData, setUsersData] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All"); // All, Pending, Approved, Rejected
+
+  // Filter State
+  const [showFilter, setShowFilter] = useState(false);
+  const [filters, setFilters] = useState({
+    activeStatus: true, // Toggle Switch
+    bookingStatus: "", // 'Booked' | 'Not Booked' | 'All' / ''
+    tourCode: "",
+    branch: ""
+  });
+
+  const [tempFilters, setTempFilters] = useState({
+    activeStatus: true,
+    bookingStatus: "",
+    tourCode: "",
+    branch: ""
+  });
+
+  useEffect(() => {
+    if (showFilter) {
+      setTempFilters(filters);
+    }
+  }, [showFilter, filters]);
+
+  const handleTempFilterChange = (key, value) => {
+    setTempFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilters = () => {
+    setFilters(tempFilters);
+    setShowFilter(false);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setTempFilters({
+      activeStatus: true,
+      bookingStatus: "",
+      tourCode: "",
+      branch: ""
+    });
+    setSearch("");
+    // Keep popup open
+  };
 
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [extraDetails, setExtraDetails] = useState([]);
@@ -399,21 +445,26 @@ export default function UserManagement({ setIsModalOpen }) {
 
   /* ================= STATUS UPDATE ================= */
   const handleStatusUpdate = async (user, status) => {
-    const isConfirmed = await confirm({
+    const result = await confirm({
       title: `${status === 'Confirmed' ? 'Approve' : 'Reject'} User?`,
-      message: `Are you sure you want to mark this user as ${status}?`,
+      message: status === 'Confirmed' 
+        ? "Are you sure you want to approve this user?" 
+        : "Please provide a reason for rejecting this user.",
       confirmText: status === 'Confirmed' ? "Approve" : "Reject",
-      type: status === 'Confirmed' ? "success" : "danger"
+      type: status === 'Confirmed' ? "success" : "danger",
+      showInput: status !== 'Confirmed',
+      inputPlaceholder: "Enter rejection remark..."
     });
 
-    if (!isConfirmed) return;
+    if (!result || (typeof result === 'object' && !result.confirmed)) return;
 
     const payload = {
       ...user,
       booking_status: status,
       is_active: status === 'Confirmed', // Optionally auto-activate on confirm
       // Ensure agent_id is a number
-      agent_id: user.agent_id ? Number(user.agent_id) : AGENT_ID
+      agent_id: user.agent_id ? Number(user.agent_id) : AGENT_ID,
+      remark: result.value || ""
     };
 
     try {
@@ -535,7 +586,7 @@ export default function UserManagement({ setIsModalOpen }) {
 
       {/* ================= ADD / EDIT MODAL ================= */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white w-full max-w-[420px] rounded-xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between mb-4">
               <h3 className="text-lg font-bold">
@@ -729,9 +780,11 @@ export default function UserManagement({ setIsModalOpen }) {
         </div>
       )}
       {showExtraForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 pt-24 pb-12 overflow-y-auto">
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl p-8 border border-gray-100 animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-8">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-100 animate-in zoom-in duration-200 flex flex-col max-h-[85vh]">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
               <h3 className="text-xl font-bold text-gray-900">
                 Edit Traveller Details
               </h3>
@@ -740,7 +793,8 @@ export default function UserManagement({ setIsModalOpen }) {
               </button>
             </div>
 
-            <div className="space-y-8 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
               {/* Personal Info Grid */}
               <div className="grid grid-cols-2 gap-6">
                 {["name", "surname", "mobile", "dob", "nationality", "gender", "relationship"].map((f) => (
@@ -801,7 +855,8 @@ export default function UserManagement({ setIsModalOpen }) {
               </div>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-4">
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-4 flex-shrink-0 bg-white rounded-b-2xl">
               <button
                 onClick={() => setShowExtraForm(false)}
                 className="px-8 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition-colors text-sm"
@@ -822,7 +877,7 @@ export default function UserManagement({ setIsModalOpen }) {
       {activeTab === "User Management" ? (
         <div className="flex flex-col">
           {/* Header */}
-          <div className="sticky top-0 z-50 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 mt-2 shadow-sm">
+          <div className="sticky top-0 z-50 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 shadow-sm">
             <div className="flex flex-col gap-4 w-[96vw] sm:w-auto p-4 sm:p-0 -mb-5 sm:mb-0 -mt-5 sm:mt-0">
               {/* <h2 className="text-lg font-bold text-gray-900">Traveller Assessment</h2> */}
               {/* Status Filter Boxes */}
@@ -865,7 +920,116 @@ export default function UserManagement({ setIsModalOpen }) {
                 })}
               </div>
             </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+
+            <div className="flex items-center gap-3 w-full sm:w-auto relative">
+                {/* Filter Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilter(!showFilter)}
+                    className={`p-2 rounded-md border transition-all ${showFilter ? "bg-indigo-50 border-indigo-300 text-indigo-600" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                  >
+                    <FiFilter size={18} />
+                  </button>
+
+                  {/* Filter Popover */}
+                  {showFilter && (
+                    <>
+                      {/* Overlay (Mobile + Desktop Click Outside) */}
+                      <div 
+                        className="fixed inset-0 bg-black/20 z-40"
+                        onClick={applyFilters}
+                      />
+                      
+                      <div className="
+                        fixed inset-x-4 top-[15%] max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-200
+                        sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-none
+                      ">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                          <h4 className="font-bold text-gray-700 text-sm">Filters</h4>
+                          <button onClick={() => setShowFilter(false)} className="text-gray-400 hover:text-gray-600">
+                            <FiX size={16} />
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {/* Status Toggle */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-600">Status</span>
+                            <button
+                              onClick={() => handleTempFilterChange("activeStatus", !tempFilters.activeStatus)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${tempFilters.activeStatus ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempFilters.activeStatus ? 'translate-x-6' : 'translate-x-1'}`}
+                              />
+                            </button>
+                            <span className="text-xs text-gray-500 w-12 text-right">{tempFilters.activeStatus ? "Active" : "Inactive"}</span>
+                          </div>
+
+                          {/* Booking Status */}
+                          <div>
+                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Booking Status</label>
+                             <div className="flex gap-2">
+                                {['All', 'Booked', 'Not Booked'].map(opt => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => handleTempFilterChange("bookingStatus", opt === 'All' ? "" : opt)}
+                                    className={`px-3 py-1.5 text-xs rounded-lg border transition-all flex-1 whitespace-nowrap ${
+                                      (opt === 'All' && !tempFilters.bookingStatus) || tempFilters.bookingStatus === opt
+                                        ? "bg-indigo-50 border-indigo-600 text-indigo-700 font-medium" 
+                                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                             </div>
+                          </div>
+
+                          {/* Tour Code */}
+                          <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Tour Code</label>
+                            <input 
+                              value={tempFilters.tourCode}
+                              onChange={(e) => handleTempFilterChange("tourCode", e.target.value)}
+                              placeholder="Enter Code..."
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                            />
+                          </div>
+
+                          {/* Branch */}
+                          <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Branch</label>
+                            <input 
+                              value={tempFilters.branch}
+                              onChange={(e) => handleTempFilterChange("branch", e.target.value)}
+                              placeholder="Enter Branch..."
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                            />
+                          </div>
+
+                          {/* Actions */}
+                          <div className="pt-2 flex gap-3">
+                             <button 
+                               onClick={clearFilters}
+                               className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium border border-gray-200"
+                             >
+                               Reset
+                             </button>
+                             <button 
+                               onClick={applyFilters}
+                               className="flex-1 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium"
+                             >
+                               Apply Filters
+                             </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
               <div className="relative w-full sm:w-64">
                 <FiSearch
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500"
@@ -880,7 +1044,7 @@ export default function UserManagement({ setIsModalOpen }) {
               </div>
               <button
                 onClick={handleAddUser}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-semibold shadow transition-all whitespace-nowrap flex items-center gap-2"
+                className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-semibold shadow transition-all whitespace-nowrap flex items-center gap-2 ${isSidebarOpen ? 'hidden xl:flex' : 'flex'}`}
               >
                 + Add User
               </button>
@@ -888,7 +1052,7 @@ export default function UserManagement({ setIsModalOpen }) {
           </div>
 
           {/* ================= TABLE WRAPPER ================= */}
-          <div className="overflow-x-auto no-scrollbar">
+          <div className="overflow-x-auto no-scrollbar max-h-[70vh] overflow-y-auto border-b border-gray-200">
             <table className="w-full text-sm border-separate border-spacing-0">
               <thead className="sticky top-0 z-40 bg-gray-100">
                 <tr className="bg-gray-100">
@@ -953,8 +1117,8 @@ export default function UserManagement({ setIsModalOpen }) {
                       <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
                       <td className="px-4 py-3 text-center">{u.tour_code || "-"}</td>
                       <td className="px-4 py-3 text-center">{u.emi_per_month || "-"}</td>
-                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid || "-"}</td>
-                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining || "-"}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid ? Number(u.amount_paid).toFixed(3) : "-"}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining ? Number(u.amount_remaining).toFixed(3) : "-"}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-orange-500 bg-yellow-100'}`}>
                           {u.booking_status || "Pending"}

@@ -18,9 +18,9 @@ export const ConfirmProvider = ({ children }) => {
         return new Promise((resolve) => {
             setConfig({
                 ...options,
-                onConfirm: () => {
+                onConfirm: (inputValue) => {
                     setConfig(null);
-                    resolve(true);
+                    resolve({ confirmed: true, value: inputValue });
                 },
                 onCancel: () => {
                     setConfig(null);
@@ -43,6 +43,8 @@ export const ConfirmProvider = ({ children }) => {
                     onConfirm={config.onConfirm}
                     onCancel={config.onCancel}
                     type={config.type}
+                    showInput={config.showInput}
+                    inputPlaceholder={config.inputPlaceholder}
                 />
             )}
         </ConfirmContext.Provider>

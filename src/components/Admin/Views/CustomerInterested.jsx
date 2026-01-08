@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { FiSearch } from "react-icons/fi";
+import { FiSearch, FiDownload } from "react-icons/fi";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import DownloadModal from "../../Common/DownloadModal";
 
 
 export default function CustomerInterested() {
   const [search, setSearch] = useState("");
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [customerCache, setCustomerCache] = useState({});
@@ -77,6 +82,103 @@ export default function CustomerInterested() {
     });
   };
 
+  const handleDownload = () => {
+    setShowDownloadModal(true);
+  };
+  
+  const processDownload = async (options) => {
+      try {
+        const pagesToFetch = options.pageOption === 'all' ? pagination.total_pages : options.customPages;
+        const allData = [];
+        const API_URL = "https://marktours-services-jn6cma3vvq-el.a.run.app/customer-interested";
+
+        // Show some loading indication? For now assume fast enough or user will see download started eventually.
+        // Ideally we should use a toast or loading state.
+        
+        for (let i = 1; i <= pagesToFetch; i++) {
+            // Check cache first if we want, but for full download fresh data might be better. 
+            // Lets fetch fresh to be safe and simple loop.
+            try {
+                const res = await fetch(`${API_URL}?page=${i}&page_size=15`);
+                const data = await res.json();
+                const pageCustomers = data?.customers || data?.data?.customers || data?.data || [];
+                allData.push(...pageCustomers);
+            } catch (err) {
+                console.error(`Error fetching page ${i}:`, err);
+            }
+        }
+
+        if (options.format === 'excel') {
+            const worksheet = XLSX.utils.json_to_sheet(allData.map((c, index) => ({
+                "S.No": index + 1,
+                "Name": c.name,
+                "Phone": c.mobile,
+                "Email": c.email,
+                "Destination": c.destination,
+                "Pincode": c.pincode,
+                "Created At": formatDate(c.created_at)
+            })));
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Interested Candidates");
+            XLSX.writeFile(workbook, "Interested_Candidates.xlsx");
+        } else if (options.format === 'pdf') {
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18);
+            doc.text("Interested Candidates Report", 14, 22);
+            doc.setFontSize(11);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+
+            const tableColumn = ["S.No", "Name", "Phone", "Email", "Destination", "Pincode", "Created"];
+            const tableRows = [];
+
+            allData.forEach((c, index) => {
+                const data = [
+                    index + 1,
+                    c.name,
+                    c.mobile,
+                    c.email,
+                    c.destination,
+                    c.pincode,
+                    formatDate(c.created_at)
+                ];
+                tableRows.push(data);
+            });
+
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: 35,
+                theme: 'grid',
+                styles: { 
+                    fontSize: 8,
+                    cellPadding: 3,
+                    overflow: 'linebreak'
+                },
+                headStyles: { 
+                    fillColor: [79, 70, 229],
+                    halign: 'center',
+                    valign: 'middle'
+                },
+                columnStyles: {
+                    0: { cellWidth: 15, halign: 'center' }, // S.No
+                    1: { cellWidth: 40 }, // Name
+                    2: { cellWidth: 25, halign: 'center' }, // Phone
+                    3: { cellWidth: 45 }, // Email
+                    4: { cellWidth: 25 }, // Destination
+                    5: { cellWidth: 20, halign: 'center' }, // Pincode
+                    6: { cellWidth: 25, halign: 'center' }  // Created
+                }
+            });
+
+            doc.save("Interested_Candidates.pdf");
+        }
+
+      } catch (error) {
+          console.error("Download failed:", error);
+      }
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm relative">
@@ -96,6 +198,15 @@ export default function CustomerInterested() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+            
+            <button 
+              onClick={handleDownload}
+              className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200"
+              title="Download Data"
+            >
+              <FiDownload size={18} />
+            </button>
           </div>
         </div>
 
@@ -192,6 +303,13 @@ export default function CustomerInterested() {
         </div>
         <div className="hidden sm:block order-3"></div>
       </div>
+      <DownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        onDownload={processDownload}
+        totalRecords={pagination.total_records}
+        totalPages={pagination.total_pages}
+      />
     </div>
   );
 }

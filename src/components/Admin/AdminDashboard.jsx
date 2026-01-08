@@ -125,7 +125,7 @@ export default function AdminDashboard({ onLogout }) {
       {/* -------------------- OVERLAY (Mobile/Tablet) -------------------- */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/50 z-[55] md:hidden transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -137,7 +137,7 @@ export default function AdminDashboard({ onLogout }) {
         ${isSidebarOpen
             ? "w-64 translate-x-0 md:mr-4"
             : "w-64 -translate-x-full md:w-0 md:translate-x-0 md:mr-0 overflow-hidden"}
-        fixed md:relative z-50 flex h-full`}
+        fixed md:relative z-[60] flex h-full`}
       >
         {/* HEADER */}
         <div className="h-20 flex items-center gap-3 px-4 border-b">
@@ -247,8 +247,8 @@ export default function AdminDashboard({ onLogout }) {
 
         {/* PAGE CONTENT */}
         <main className="overflow-y-auto scrollbar-hide bg-[#eefaff] flex-1 w-full">
-          <div className="w-full sm:px-4 pb-4 px-1">
-            {React.cloneElement(ActiveComponent, { setIsModalOpen })}
+          <div className="w-full sm:px-4 px-1">
+            {React.cloneElement(ActiveComponent, { setIsModalOpen, isSidebarOpen })}
           </div>
         </main>
       </div>
