@@ -504,6 +504,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       if (res.ok) {
         addToast(`User ${status} successfully`, "success");
         refreshCurrentPage();
+        handleOpenTransactionModal(user);
       } else {
         const err = await res.json();
         addToast(`Failed: ${err.detail || "Update failed"}`, "error");
@@ -1119,7 +1120,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                     <div className="flex items-center justify-center">Remaining <SortIcon columnKey="amount_remaining" /></div>
                   </th>
                   <th onClick={() => handleSort('booking_status')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center">Booking Status <SortIcon columnKey="booking_status" /></div>
+                    <div className="flex items-center justify-center"> Status <SortIcon columnKey="booking_status" /></div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Transaction</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Action</th>
@@ -1480,7 +1481,13 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
               </div>
 
               {/* Transactions Table */}
-              <div className="overflow-y-auto max-h-[400px] border border-gray-100 rounded-xl bg-gray-50 min-h-[200px] relative scrollbar-thin scrollbar-thumb-gray-200">
+              <div className="overflow-y-auto max-h-[350px] border border-gray-100 rounded-xl bg-gray-50 min-h-[100px] relative 
+                [&::-webkit-scrollbar]:w-1.5 
+                [&::-webkit-scrollbar-track]:bg-indigo-50 
+                [&::-webkit-scrollbar-track]:rounded-full 
+                [&::-webkit-scrollbar-thumb]:bg-indigo-400 
+                [&::-webkit-scrollbar-thumb]:rounded-full 
+                hover:[&::-webkit-scrollbar-thumb]:bg-indigo-500">
                 {transactionsLoading ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
                     <FiLoader className="animate-spin text-indigo-600 mr-2" />
@@ -1496,6 +1503,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                       <tr>
                         <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px]">UTR No.</th>
                         <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px]">Date</th>
+                        <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px] text-center">Month</th>
                         <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px] text-right">Amount</th>
                         <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px] text-center">Status</th>
                       </tr>
@@ -1526,6 +1534,9 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                             <td className="px-4 py-3 text-gray-600 text-xs">
                               {txn.created_at ? new Date(txn.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                             </td>
+                            <td className="px-4 py-3 text-center text-xs font-semibold text-gray-700">
+                              {txn.emi_month || '-'}
+                            </td>
                             <td className="px-4 py-3 font-bold text-indigo-600 text-right text-xs">₹{Number(txn.amount || 0).toLocaleString()}</td>
                             <td className="px-4 py-3 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${(txn.status || '').toLowerCase() === 'completed' || (txn.status || '').toLowerCase() === 'success' || (txn.status || '').toLowerCase() === 'approved'
@@ -1538,11 +1549,27 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                           </tr>
                           {expandedTransactionId === (txn.tx_id || idx) && (
                             <tr className="bg-gray-50/50">
-                              <td colSpan="4" className="px-4 py-4">
+                              <td colSpan="5" className="px-4 py-4">
                                 <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm animate-in slide-in-from-top-2 duration-200">
                                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                                     <div className="space-y-3">
-                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Transaction ID</p><p className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-block">{txn.tx_id || "N/A"}</p></div>
+                                      <div>
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Transaction ID</p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-block">
+                                            {txn.tx_id || "N/A"}
+                                          </p>
+                                          {txn.tx_id && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); copyToClipboard(txn.tx_id, `${idx}-txid`); }}
+                                              className={`transition-colors p-1 rounded-md hover:bg-indigo-50 ${copiedId === `${idx}-txid` ? "text-green-600" : "text-gray-400 hover:text-indigo-600"}`}
+                                              title="Copy Transaction ID"
+                                            >
+                                              {copiedId === `${idx}-txid` ? <FiCheck size={14} /> : <FiCopy size={13} />}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
                                       <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tour Code</p><p className="text-xs font-semibold text-gray-900">{txn.tour_code || "N/A"}</p></div>
                                     </div>
                                     <div className="space-y-3">
