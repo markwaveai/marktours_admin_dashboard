@@ -213,9 +213,19 @@ export default function AdminDashboard({ onLogout }) {
       </aside>
 
       {/* -------------------- MAIN CONTENT -------------------- */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {activeTab === "Dashboard" && !isSidebarOpen && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 z-40 transition-all text-gray-600"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
 
         {/* TOP HEADER */}
+        {/* TOP HEADER */}
+        {activeTab !== "Dashboard" && (
         <header className={`w-full bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-30 transition-all duration-300
           ${shouldHideHeader
             ? "opacity-20 pointer-events-none grayscale"
@@ -244,6 +254,7 @@ export default function AdminDashboard({ onLogout }) {
             </p>
           </div> */}
         </header>
+        )}
 
         {/* PAGE CONTENT */}
         <main className="overflow-y-auto scrollbar-hide bg-[#eefaff] flex-1 w-full">

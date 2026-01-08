@@ -4,6 +4,7 @@ import {
     FiEdit,
     FiTrash2,
     FiSearch,
+    FiX,
 } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
@@ -352,11 +353,19 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                                 size={16}
                             />
                             <input
-                                className="w-full sm:w-64 pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
+                                className="w-full sm:w-64 pl-9 pr-9 py-2 text-sm rounded-lg bg-gray-100 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
                                 placeholder="Search..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    <FiX size={14} />
+                                </button>
+                            )}
                         </div>
 
                         <button

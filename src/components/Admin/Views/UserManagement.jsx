@@ -109,7 +109,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const [extraLoading, setExtraLoading] = useState(false);
 
   // Sorting State
-  const [sortConfig, setSortConfig] = useState({ key: 'user_id', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
   const handleSort = (key) => {
     if (sortConfig.key !== key) {
@@ -211,6 +211,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       const cachedAgents = sessionStorage.getItem("agentsList");
       if (cachedAgents) {
         setAgentsList(JSON.parse(cachedAgents));
+        return; 
       }
 
       try {
@@ -471,11 +472,12 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   };
 
   /* ================= STATUS UPDATE ================= */
+  /* ================= STATUS UPDATE ================= */
   const handleStatusUpdate = async (user, status) => {
     const result = await confirm({
-      title: `${status === 'Confirmed' ? 'Approve' : 'Reject'} User?`,
+      title: `${status === 'Confirmed' ? 'Confirm Approval' : 'Reject User'}?`,
       message: status === 'Confirmed'
-        ? "Are you sure you want to approve this user?"
+        ? "Are you sure you want to approve this transaction?"
         : "Please provide a reason for rejecting this user.",
       confirmText: status === 'Confirmed' ? "Approve" : "Reject",
       type: status === 'Confirmed' ? "success" : "danger",
@@ -484,6 +486,59 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
     });
 
     if (!result || (typeof result === 'object' && !result.confirmed)) return;
+
+    // Transaction Logic for 'Confirmed' or 'Rejected' status
+    if (status === 'Confirmed' || status === 'Rejected') {
+      try {
+        const txUrl = `${BASE_URL}/transactions/user/${user.user_id}?status=PENDING&page=1&page_size=1`;
+        console.log("Fetching pending transactions from:", txUrl);
+        const txRes = await fetch(txUrl);
+        const txData = await txRes.json();
+        console.log("Transaction API Response:", txData);
+        
+        // Flexible data extraction
+        const txList = txData.data || txData.transactions || txData.results || (Array.isArray(txData) ? txData : []);
+        const pendingTx = txList && txList[0]; 
+        
+        if (pendingTx) {
+          console.log("Found pending transaction:", pendingTx);
+          const txId = pendingTx.tx_id || pendingTx.id || pendingTx.transaction_id;
+          const { utr_no, utr_image_url, emi_month } = pendingTx;
+          
+          if (txId) {
+             console.log(`Updating transaction ID: ${txId} to ${status === 'Confirmed' ? 'APPROVED' : 'REJECTED'}`);
+             const approveTxRes = await fetch(`${BASE_URL}/transactions/${txId}`, {
+               method: "PUT",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                 status: status === 'Confirmed' ? "APPROVED" : "REJECTED",
+                 utr_no: utr_no || "string",
+                 utr_image_url: utr_image_url || "string",
+                 emi_month: Number(emi_month) || 0
+               })
+             });
+
+             if (!approveTxRes.ok) {
+               const txErr = await approveTxRes.text();
+               console.error("Transaction Update Failed:", txErr);
+               addToast("Failed to update transaction status.", "error");
+               return; 
+             }
+             addToast(status === 'Confirmed' ? "Pending transaction approved." : "Pending transaction rejected.", "success");
+          } else {
+             console.warn("Transaction found but no valid ID (tx_id/id) present.");
+          }
+        } else {
+           console.log("No pending transactions found for user.");
+           addToast("NO PENDING EMI FOUND", "error");
+           return;
+        }
+      } catch (e) {
+        console.error("Error checking transactions:", e);
+        addToast("Error verifying transactions. Check console.", "error");
+        return; 
+      }
+    }
 
     const payload = {
       ...user,
@@ -502,7 +557,11 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       });
 
       if (res.ok) {
-        addToast(`User ${status} successfully`, "success");
+        if (status === 'Confirmed') {
+          addToast("Transaction Confirmed Successfully", "success");
+        } else {
+          addToast(`User ${status} successfully`, "success"); // Reject case
+        }
         refreshCurrentPage();
         handleOpenTransactionModal(user);
       } else {
@@ -1063,11 +1122,19 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                   size={16}
                 />
                 <input
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-gray-50 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
+                  className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-gray-50 focus:bg-white border border-transparent focus:border-indigo-300 outline-none transition-all"
                   placeholder="Search..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <FiX size={14} />
+                  </button>
+                )}
               </div>
               <button
                 onClick={handleAddUser}
