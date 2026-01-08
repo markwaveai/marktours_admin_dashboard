@@ -155,6 +155,32 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
     }));
   };
 
+  /* ================= TRANSACTION MODAL STATE ================= */
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [selectedUserForTransaction, setSelectedUserForTransaction] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [expandedTransactionId, setExpandedTransactionId] = useState(null);
+
+  const handleOpenTransactionModal = async (user) => {
+    setSelectedUserForTransaction(user);
+    setShowTransactionModal(true);
+    setTransactions([]);
+    setTransactionsLoading(true);
+    setExpandedTransactionId(null);
+
+    try {
+      const res = await fetch(`${BASE_URL}/transactions?user_id=${user.user_id}&page=1&page_size=15`);
+      const data = await res.json();
+      setTransactions(data.transactions || []);
+    } catch (error) {
+      console.error("Failed to fetch transactions", error);
+      addToast("Failed to load transactions", "error");
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
+
   const emptyExtraForm = {
     user_id: null,
     mobile: "",
@@ -218,6 +244,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const [form, setForm] = useState(emptyForm);
   const [viewImg, setViewImg] = useState(null);
   const [imgLoading, setImgLoading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   // Branch Suggestions
   const [showBranchSuggestions, setShowBranchSuggestions] = useState(false);
@@ -447,8 +474,8 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const handleStatusUpdate = async (user, status) => {
     const result = await confirm({
       title: `${status === 'Confirmed' ? 'Approve' : 'Reject'} User?`,
-      message: status === 'Confirmed' 
-        ? "Are you sure you want to approve this user?" 
+      message: status === 'Confirmed'
+        ? "Are you sure you want to approve this user?"
         : "Please provide a reason for rejecting this user.",
       confirmText: status === 'Confirmed' ? "Approve" : "Reject",
       type: status === 'Confirmed' ? "success" : "danger",
@@ -782,7 +809,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       {showExtraForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-100 animate-in zoom-in duration-200 flex flex-col max-h-[85vh]">
-            
+
             {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
               <h3 className="text-xl font-bold text-gray-900">
@@ -922,113 +949,112 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto relative">
-                {/* Filter Button */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowFilter(!showFilter)}
-                    className={`p-2 rounded-md border transition-all ${showFilter ? "bg-indigo-50 border-indigo-300 text-indigo-600" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
-                  >
-                    <FiFilter size={18} />
-                  </button>
+              {/* Filter Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowFilter(!showFilter)}
+                  className={`p-2 rounded-md border transition-all ${showFilter ? "bg-indigo-50 border-indigo-300 text-indigo-600" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                >
+                  <FiFilter size={18} />
+                </button>
 
-                  {/* Filter Popover */}
-                  {showFilter && (
-                    <>
-                      {/* Overlay (Mobile + Desktop Click Outside) */}
-                      <div 
-                        className="fixed inset-0 bg-black/20 z-40"
-                        onClick={applyFilters}
-                      />
-                      
-                      <div className="
+                {/* Filter Popover */}
+                {showFilter && (
+                  <>
+                    {/* Overlay (Mobile + Desktop Click Outside) */}
+                    <div
+                      className="fixed inset-0 bg-black/20 z-40"
+                      onClick={applyFilters}
+                    />
+
+                    <div className="
                         fixed inset-x-4 top-[15%] max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-200
                         sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-none
                       ">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                          <h4 className="font-bold text-gray-700 text-sm">Filters</h4>
-                          <button onClick={() => setShowFilter(false)} className="text-gray-400 hover:text-gray-600">
-                            <FiX size={16} />
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                        <h4 className="font-bold text-gray-700 text-sm">Filters</h4>
+                        <button onClick={() => setShowFilter(false)} className="text-gray-400 hover:text-gray-600">
+                          <FiX size={16} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Status Toggle */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-600">Status</span>
+                          <button
+                            onClick={() => handleTempFilterChange("activeStatus", !tempFilters.activeStatus)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${tempFilters.activeStatus ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempFilters.activeStatus ? 'translate-x-6' : 'translate-x-1'}`}
+                            />
+                          </button>
+                          <span className="text-xs text-gray-500 w-12 text-right">{tempFilters.activeStatus ? "Active" : "Inactive"}</span>
+                        </div>
+
+                        {/* Booking Status */}
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Booking Status</label>
+                          <div className="flex gap-2">
+                            {['All', 'Booked', 'Not Booked'].map(opt => (
+                              <button
+                                key={opt}
+                                onClick={() => handleTempFilterChange("bookingStatus", opt === 'All' ? "" : opt)}
+                                className={`px-3 py-1.5 text-xs rounded-lg border transition-all flex-1 whitespace-nowrap ${(opt === 'All' && !tempFilters.bookingStatus) || tempFilters.bookingStatus === opt
+                                  ? "bg-indigo-50 border-indigo-600 text-indigo-700 font-medium"
+                                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                  }`}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Tour Code */}
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Tour Code</label>
+                          <input
+                            value={tempFilters.tourCode}
+                            onChange={(e) => handleTempFilterChange("tourCode", e.target.value)}
+                            placeholder="Enter Code..."
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Branch */}
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Branch</label>
+                          <input
+                            value={tempFilters.branch}
+                            onChange={(e) => handleTempFilterChange("branch", e.target.value)}
+                            placeholder="Enter Branch..."
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="pt-2 flex gap-3">
+                          <button
+                            onClick={clearFilters}
+                            className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium border border-gray-200"
+                          >
+                            Reset
+                          </button>
+                          <button
+                            onClick={applyFilters}
+                            className="flex-1 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium"
+                          >
+                            Apply Filters
                           </button>
                         </div>
 
-                        <div className="space-y-4">
-                          {/* Status Toggle */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-600">Status</span>
-                            <button
-                              onClick={() => handleTempFilterChange("activeStatus", !tempFilters.activeStatus)}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${tempFilters.activeStatus ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tempFilters.activeStatus ? 'translate-x-6' : 'translate-x-1'}`}
-                              />
-                            </button>
-                            <span className="text-xs text-gray-500 w-12 text-right">{tempFilters.activeStatus ? "Active" : "Inactive"}</span>
-                          </div>
-
-                          {/* Booking Status */}
-                          <div>
-                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Booking Status</label>
-                             <div className="flex gap-2">
-                                {['All', 'Booked', 'Not Booked'].map(opt => (
-                                  <button
-                                    key={opt}
-                                    onClick={() => handleTempFilterChange("bookingStatus", opt === 'All' ? "" : opt)}
-                                    className={`px-3 py-1.5 text-xs rounded-lg border transition-all flex-1 whitespace-nowrap ${
-                                      (opt === 'All' && !tempFilters.bookingStatus) || tempFilters.bookingStatus === opt
-                                        ? "bg-indigo-50 border-indigo-600 text-indigo-700 font-medium" 
-                                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                    }`}
-                                  >
-                                    {opt}
-                                  </button>
-                                ))}
-                             </div>
-                          </div>
-
-                          {/* Tour Code */}
-                          <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Tour Code</label>
-                            <input 
-                              value={tempFilters.tourCode}
-                              onChange={(e) => handleTempFilterChange("tourCode", e.target.value)}
-                              placeholder="Enter Code..."
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                            />
-                          </div>
-
-                          {/* Branch */}
-                          <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Branch</label>
-                            <input 
-                              value={tempFilters.branch}
-                              onChange={(e) => handleTempFilterChange("branch", e.target.value)}
-                              placeholder="Enter Branch..."
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
-                            />
-                          </div>
-
-                          {/* Actions */}
-                          <div className="pt-2 flex gap-3">
-                             <button 
-                               onClick={clearFilters}
-                               className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium border border-gray-200"
-                             >
-                               Reset
-                             </button>
-                             <button 
-                               onClick={applyFilters}
-                               className="flex-1 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium"
-                             >
-                               Apply Filters
-                             </button>
-                          </div>
-
-                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="relative w-full sm:w-64">
                 <FiSearch
@@ -1065,11 +1091,14 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                   <th onClick={() => handleSort('mobile')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[210px] z-40 bg-gray-100 min-w-[130px] border-b border-r border-gray-200 cursor-pointer group">
                     <div className="flex items-center justify-center">Mobile <SortIcon columnKey="mobile" /></div>
                   </th>
-                  <th onClick={() => handleSort('agent_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
-                    <div className="flex items-center justify-center">Agent ID <SortIcon columnKey="agent_id" /></div>
+                  <th onClick={() => handleSort('user_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">User ID <SortIcon columnKey="user_id" /></div>
                   </th>
                   <th onClick={() => handleSort('email')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
                     <div className="flex items-center justify-center">Email <SortIcon columnKey="email" /></div>
+                  </th>
+                  <th onClick={() => handleSort('agent_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Agent ID <SortIcon columnKey="agent_id" /></div>
                   </th>
                   <th onClick={() => handleSort('branch')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
                     <div className="flex items-center justify-center">Branch <SortIcon columnKey="branch" /></div>
@@ -1092,9 +1121,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                   <th onClick={() => handleSort('booking_status')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
                     <div className="flex items-center justify-center">Booking Status <SortIcon columnKey="booking_status" /></div>
                   </th>
-                  <th onClick={() => handleSort('is_active')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center">Status <SortIcon columnKey="is_active" /></div>
-                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Transaction</th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Action</th>
                 </tr>
               </thead>
@@ -1110,8 +1137,9 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                       <td className={`px-4 py-3 text-center sm:sticky left-0 z-10 min-w-[60px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{(currentPage - 1) * pagination.page_size + i + 1}</td>
                       <td className={`px-4 py-3 text-center sm:sticky left-[60px] z-10 min-w-[150px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.name}</td>
                       <td className={`px-4 py-3 text-center sm:sticky left-[210px] z-10 min-w-[130px] border-b border-r border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.mobile}</td>
-                      <td className="px-4 py-3 text-center font-mono text-gray-600 border-b border-gray-100">{u.agent_id || "N/A"}</td>
+                      <td className="px-4 py-3 text-center font-mono text-gray-500 border-b border-gray-100 italic">{u.user_id}</td>
                       <td className="px-4 py-3 text-center border-b border-gray-100">{u.email}</td>
+                      <td className="px-4 py-3 text-center font-mono text-gray-600 border-b border-gray-100">{u.agent_id || "N/A"}</td>
 
                       <td className="px-4 py-3 text-center">{u.branch}</td>
                       <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
@@ -1124,11 +1152,17 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                           {u.booking_status || "Pending"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center bg-gray-50">
-                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 text-green-800 bg-green-100 rounded-full
-                      ${!u.is_active && "text-red-800 bg-red-100"}`}>
-                          {u.is_active ? "Active" : "Inactive"}
-                        </span>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTransactionModal(u);
+                          }}
+                          className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg transition-colors group/btn"
+                          title="View Transactions"
+                        >
+                          <FiList className="w-4 h-4" />
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-2">
@@ -1157,7 +1191,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                     {/* ================= EXTRA DETAILS ================= */}
                     {expandedUserId === u.user_id && (
                       <tr>
-                        <td colSpan="14" className="p-0 border-b">
+                        <td colSpan="15" className="p-0 border-b">
                           <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-6">
                             {extraLoading ? (
                               <SkeletonLoader type="table" count={5} />
@@ -1362,34 +1396,197 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
       {/* Image Preview Modal */}
       {viewImg && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewImg(null)}>
-          <div className="relative w-[40%] h-1/2 bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden transition-all" onClick={e => e.stopPropagation()}>
-            <div className="absolute top-2 right-2 z-10">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setViewImg(null)}>
+          <div className="relative max-w-2xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="absolute top-4 right-4 z-20">
               <button
                 onClick={() => setViewImg(null)}
-                className="bg-black/50 text-white hover:bg-black/70 rounded-full p-2 transition-colors"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-2.5 transition-all hover:rotate-90 shadow-sm"
               >
                 <FiX size={20} />
               </button>
             </div>
-            <div className="flex-1 w-full h-full bg-gray-100 flex items-center justify-center overflow-hidden relative">
-              {imgLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-0">
+            <div className="p-8 flex items-center justify-center min-h-[400px] bg-white relative">
+              {imgLoading && !imgError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10">
                   <FiLoader className="animate-spin text-indigo-600 mb-2" size={32} />
-                  <p className="text-xs font-medium text-gray-400">Loading Image...</p>
+                  <p className="text-xs font-medium text-gray-400">Loading Preview...</p>
                 </div>
               )}
-              <img
-                src={viewImg}
-                alt="Preview"
-                onLoad={() => setImgLoading(false)}
-                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
-                onError={(e) => {
-                  setImgLoading(false);
-                  e.target.style.display = 'none';
-                  e.target.parentElement.innerHTML = '<div class="text-center p-4"> <p class="font-bold text-gray-500 mb-2">Preview Failed</p> <a href="' + viewImg + '" target="_blank" class="text-indigo-600 underline text-sm">Open in New Tab</a> </div>';
-                }}
-              />
+              {imgError ? (
+                <div className="text-center p-12">
+                  <div className="bg-red-50 text-red-500 p-6 rounded-2xl border border-red-100 inline-block">
+                    <p className="font-bold text-base mb-1 text-red-700">Preview Unavailable</p>
+                    <p className="text-xs text-red-500">The receipt image could not be loaded.</p>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={viewImg}
+                  alt="Receipt Preview"
+                  onLoad={() => setImgLoading(false)}
+                  onError={() => { setImgError(true); setImgLoading(false); }}
+                  className={`max-w-full max-h-[75vh] object-contain rounded-lg shadow-sm transition-all duration-500 ${imgLoading ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Details Modal */}
+      {showTransactionModal && selectedUserForTransaction && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in duration-300"
+          onClick={() => setShowTransactionModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex justify-between items-center text-white">
+              <div>
+                <h3 className="text-xl font-bold">Transaction History</h3>
+                <p className="text-indigo-100 text-xs mt-1">
+                  User: <span className="font-semibold text-white">{selectedUserForTransaction.name}</span> |
+                  Mobile: <span className="font-semibold text-white">{selectedUserForTransaction.mobile}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTransactionModal(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <FiX size={24} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {/* Summary Small Cards */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                  <p className="text-[10px] uppercase font-bold text-indigo-500 tracking-wider">EMI Amount</p>
+                  <p className="text-lg font-bold text-indigo-700">₹{Number(selectedUserForTransaction.emi_per_month || 0).toLocaleString()}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                  <p className="text-[10px] uppercase font-bold text-green-500 tracking-wider">Total Paid</p>
+                  <p className="text-lg font-bold text-green-700">₹{Number(selectedUserForTransaction.amount_paid || 0).toLocaleString()}</p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                  <p className="text-[10px] uppercase font-bold text-orange-500 tracking-wider">Remaining</p>
+                  <p className="text-lg font-bold text-orange-700">₹{Number(selectedUserForTransaction.amount_remaining || 0).toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Transactions Table */}
+              <div className="overflow-y-auto max-h-[400px] border border-gray-100 rounded-xl bg-gray-50 min-h-[200px] relative scrollbar-thin scrollbar-thumb-gray-200">
+                {transactionsLoading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                    <FiLoader className="animate-spin text-indigo-600 mr-2" />
+                    <span className="text-sm font-medium text-gray-500">Fetching transactions...</span>
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <div className="p-12 text-center bg-white">
+                    <p className="text-gray-400 italic">No transactions found for this user.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-white border-b border-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px]">UTR No.</th>
+                        <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px]">Date</th>
+                        <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px] text-right">Amount</th>
+                        <th className="px-4 py-3 font-bold text-gray-500 uppercase text-[10px] text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {transactions.map((txn, idx) => (
+                        <React.Fragment key={txn.tx_id || idx}>
+                          <tr
+                            onClick={() => setExpandedTransactionId(expandedTransactionId === (txn.tx_id || idx) ? null : (txn.tx_id || idx))}
+                            className={`transition-colors cursor-pointer ${expandedTransactionId === (txn.tx_id || idx) ? 'bg-indigo-50/50' : 'hover:bg-gray-50'}`}
+                          >
+                            <td className="px-4 py-3 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-gray-400">
+                                  {txn.utr_no || 'N/A'}
+                                </span>
+                                {txn.utr_no && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(txn.utr_no, `${idx}-utr`); }}
+                                    className={`transition-colors ${copiedId === `${idx}-utr` ? "text-green-600" : "text-gray-400 hover:text-indigo-600"}`}
+                                    title="Copy UTR No."
+                                  >
+                                    {copiedId === `${idx}-utr` ? <FiCheck size={12} /> : <FiCopy size={11} />}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 text-xs">
+                              {txn.created_at ? new Date(txn.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-indigo-600 text-right text-xs">₹{Number(txn.amount || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${(txn.status || '').toLowerCase() === 'completed' || (txn.status || '').toLowerCase() === 'success' || (txn.status || '').toLowerCase() === 'approved'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                {txn.status || 'Pending'}
+                              </span>
+                            </td>
+                          </tr>
+                          {expandedTransactionId === (txn.tx_id || idx) && (
+                            <tr className="bg-gray-50/50">
+                              <td colSpan="4" className="px-4 py-4">
+                                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm animate-in slide-in-from-top-2 duration-200">
+                                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Transaction ID</p><p className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-block">{txn.tx_id || "N/A"}</p></div>
+                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tour Code</p><p className="text-xs font-semibold text-gray-900">{txn.tour_code || "N/A"}</p></div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">EMI Month</p><p className="text-xs font-semibold text-gray-900">{txn.emi_month || "N/A"}</p></div>
+                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Date & Time</p><p className="text-xs font-semibold text-gray-900">{txn.created_at ? new Date(txn.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p></div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Remarks</p><p className="text-xs italic text-gray-500">{txn.remarks || "No remarks provided"}</p></div>
+                                      <div className="pt-1">
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Receipt</p>
+                                        {txn.utr_image_url ? (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setViewImg(txn.utr_image_url); setImgLoading(true); setImgError(false); }}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors text-[10px] font-bold border border-indigo-200 w-fit"
+                                          >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            View Image
+                                          </button>
+                                        ) : (
+                                          <p className="text-[10px] text-gray-400 italic">No Image</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setShowTransactionModal(false)}
+                className="px-6 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all shadow-sm"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
