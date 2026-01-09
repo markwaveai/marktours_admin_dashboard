@@ -71,7 +71,7 @@ export default function TourManagement() {
     page_size: 9
   });
   const fetchingRef = useRef(null);
-  
+
   // Local state for pagination input to allow free typing
   const [pageInput, setPageInput] = useState(1);
   useEffect(() => {
@@ -89,6 +89,7 @@ export default function TourManagement() {
 
   const [formData, setFormData] = useState({
     id: null,
+    tour_id: "",
     tour_name: "",
     tour_code: "",
     start_date: getTodayDDMMYYYY(),
@@ -98,14 +99,20 @@ export default function TourManagement() {
     package_price: "",
     available_slots: "",
     booked_slots: "",
-    arrival_at: getTodayDDMMYYYY(),
-    depature_at: getTodayDDMMYYYY(),
-    arrivals_place: "",
-    depature_place: "",
+    source_start_at: getTodayDDMMYYYY(),
+    destination_end_at: getTodayDDMMYYYY(),
+    source_start_place: "",
+    destination_end_place: "",
     days_count: "",
     nights_count: "",
     emi_per_month: "",
     tour_image_url: "",
+    tour_images: [],
+    tourjsondata: {
+      activities: [],
+      guide: "",
+      hotel: ""
+    }
   });
 
   const [isEdit, setIsEdit] = useState(false);
@@ -201,12 +208,12 @@ export default function TourManagement() {
     const formatDateTime = (dateStr) => {
       if (!dateStr) return null;
       if (dateStr.includes("T")) return dateStr;
-      
+
       // Convert dd-mm-yyyy to yyyy-mm-dd
       const parts = dateStr.split("-");
       if (parts.length === 3) {
-         const [d, m, y] = parts;
-         return `${y}-${m}-${d}T09:00:00`;
+        const [d, m, y] = parts;
+        return `${y}-${m}-${d}T09:00:00`;
       }
       return null;
     };
@@ -219,6 +226,7 @@ export default function TourManagement() {
     };
 
     const payload = {
+      tour_id: formData.tour_id || Date.now(),
       tour_name: formData.tour_name,
       tour_code: isEdit ? formData.tour_code : generateTourCode(formData.tour_name),
       start_date: formatDateTime(formData.start_date),
@@ -228,14 +236,16 @@ export default function TourManagement() {
       package_price: Number(formData.package_price),
       available_slots: formData.available_slots ? Number(formData.available_slots) : Number(formData.slots),
       booked_slots: formData.booked_slots ? Number(formData.booked_slots) : 0,
-      arrival_at: formatDateTime(formData.arrival_at),
-      depature_at: formatDateTime(formData.depature_at),
-      arrivals_place: formData.arrivals_place,
-      depature_place: formData.depature_place,
+      source_start_at: formatDateTime(formData.source_start_at),
+      destination_end_at: formatDateTime(formData.destination_end_at),
+      source_start_place: formData.source_start_place,
+      destination_end_place: formData.destination_end_place,
       days_count: Number(formData.days_count),
       nights_count: Number(formData.nights_count),
       emi_per_month: Number(formData.emi_per_month),
       tour_image_url: formData.tour_image_url,
+      tour_images: formData.tour_images,
+      tourjsondata: formData.tourjsondata,
     };
 
     // console.log("Tour Management Payload:", payload);
@@ -312,6 +322,43 @@ export default function TourManagement() {
     reader.readAsDataURL(file);
   };
 
+  const handleMultipleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    // Check file sizes
+    const oversizedFiles = files.filter(file => file.size > 2 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      addToast(`${oversizedFiles.length} image(s) are too large. Please select files smaller than 2MB.`, "error");
+      return;
+    }
+
+    setUploading(true);
+    const readers = files.map(file => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers)
+      .then(results => {
+        setFormData(prev => ({
+          ...prev,
+          tour_images: [...(prev.tour_images || []), ...results]
+        }));
+        setUploading(false);
+        e.target.value = ""; // Reset input
+        addToast(`${results.length} image(s) uploaded successfully`, "success");
+      })
+      .catch(() => {
+        addToast("Failed to read some files.", "error");
+        setUploading(false);
+      });
+  };
+
   const handleCreateClick = () => {
     resetForm();
     setShowCreateModal(true);
@@ -320,14 +367,15 @@ export default function TourManagement() {
   const handleEditClick = (tour) => {
     // Helper to convert yyyy-mm-dd (or ISO) to dd-mm-yyyy
     const toDDMMYYYY = (isoStr) => {
-       if (!isoStr) return "";
-       const datePart = isoStr.split("T")[0]; // yyyy-mm-dd
-       const [y, m, d] = datePart.split("-");
-       return `${d}-${m}-${y}`;
+      if (!isoStr) return "";
+      const datePart = isoStr.split("T")[0]; // yyyy-mm-dd
+      const [y, m, d] = datePart.split("-");
+      return `${d}-${m}-${y}`;
     };
 
     setFormData({
       ...tour,
+      tour_id: tour.tour_id?.toString() || "",
       slots: tour.slots?.toString() || "",
       package_price: tour.package_price?.toString() || "",
       available_slots: tour.available_slots?.toString() || "",
@@ -336,13 +384,15 @@ export default function TourManagement() {
       nights_count: tour.nights_count?.toString() || "",
       emi_per_month: tour.emi_per_month?.toString() || "",
       tour_image_url: tour.tour_image_url || "",
+      tour_images: tour.tour_images || [],
       start_date: toDDMMYYYY(tour.start_date),
       end_date: toDDMMYYYY(tour.end_date),
-      arrival_at: toDDMMYYYY(tour.arrival_at),
-      depature_at: toDDMMYYYY(tour.depature_at),
+      source_start_at: toDDMMYYYY(tour.source_start_at),
+      destination_end_at: toDDMMYYYY(tour.destination_end_at),
       tour_description: tour.tour_description || "",
-      arrivals_place: tour.arrivals_place || "",
-      depature_place: tour.depature_place || "",
+      source_start_place: tour.source_start_place || "",
+      destination_end_place: tour.destination_end_place || "",
+      tourjsondata: tour.tourjsondata || { activities: [], guide: "", hotel: "" },
     });
     setIsEdit(true);
     setShowCreateModal(true);
@@ -351,6 +401,7 @@ export default function TourManagement() {
   const resetForm = () => {
     setFormData({
       id: null,
+      tour_id: "",
       tour_name: "",
       tour_code: "",
       slots: "",
@@ -361,13 +412,19 @@ export default function TourManagement() {
       booked_slots: "",
       start_date: getTodayDDMMYYYY(),
       end_date: getTodayDDMMYYYY(),
-      arrival_at: getTodayDDMMYYYY(),
-      depature_at: getTodayDDMMYYYY(),
-      arrivals_place: "",
-      depature_place: "",
+      source_start_at: getTodayDDMMYYYY(),
+      destination_end_at: getTodayDDMMYYYY(),
+      source_start_place: "",
+      destination_end_place: "",
       days_count: "",
       nights_count: "",
       tour_image_url: "",
+      tour_images: [],
+      tourjsondata: {
+        activities: [],
+        guide: "",
+        hotel: ""
+      }
     });
     setIsEdit(false);
   };
@@ -379,21 +436,21 @@ export default function TourManagement() {
     // Masking logic
     let formatted = val;
     if (val.length > 4) {
-       formatted = `${val.slice(0, 2)}-${val.slice(2, 4)}-${val.slice(4)}`;
+      formatted = `${val.slice(0, 2)}-${val.slice(2, 4)}-${val.slice(4)}`;
     } else if (val.length > 2) {
-       formatted = `${val.slice(0, 2)}-${val.slice(2)}`;
+      formatted = `${val.slice(0, 2)}-${val.slice(2)}`;
     }
 
     setFormData({ ...formData, [fieldName]: formatted });
   };
 
   const handlePickerChange = (e, fieldName) => {
-     // Picker returns yyyy-mm-dd
-     const val = e.target.value; 
-     if(!val) return;
-     const [y, m, d] = val.split("-");
-     const formatted = `${d}-${m}-${y}`;
-     setFormData({ ...formData, [fieldName]: formatted });
+    // Picker returns yyyy-mm-dd
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split("-");
+    const formatted = `${d}-${m}-${y}`;
+    setFormData({ ...formData, [fieldName]: formatted });
   };
 
   const filteredTours = tours.filter((t) =>
@@ -444,8 +501,8 @@ export default function TourManagement() {
             <div className="flex gap-3">
               <div className="w-[60%] h-[80px] rounded-lg overflow-hidden">
                 <TourImage
-                  key={tour.tour_image_url}
-                  src={tour.tour_image_url}
+                  key={tour.tour_images?.[0] || tour.tour_image_url}
+                  src={tour.tour_images?.[0] || tour.tour_image_url}
                   tourName={tour.tour_name}
                   className="w-full h-full object-cover"
                 />
@@ -633,14 +690,14 @@ export default function TourManagement() {
                     />
                     {/* Hidden Date Input for Picker */}
                     <input
-                         type="date"
-                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-                         id="picker-start_date"
-                         onChange={(e) => handlePickerChange(e, "start_date")}
+                      type="date"
+                      className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                      id="picker-start_date"
+                      onChange={(e) => handlePickerChange(e, "start_date")}
                     />
-                    <FiCalendar 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-                        onClick={() => document.getElementById("picker-start_date")?.showPicker()} 
+                    <FiCalendar
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                      onClick={() => document.getElementById("picker-start_date")?.showPicker()}
                     />
                   </div>
                 </div>
@@ -658,83 +715,83 @@ export default function TourManagement() {
                       required
                     />
                     <input
-                         type="date"
-                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-                         id="picker-end_date"
-                         onChange={(e) => handlePickerChange(e, "end_date")}
+                      type="date"
+                      className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                      id="picker-end_date"
+                      onChange={(e) => handlePickerChange(e, "end_date")}
                     />
-                    <FiCalendar 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-                        onClick={() => document.getElementById("picker-end_date")?.showPicker()} 
+                    <FiCalendar
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                      onClick={() => document.getElementById("picker-end_date")?.showPicker()}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-500">Arrival At</label>
+                  <label className="text-xs font-semibold text-gray-500">Source Start At</label>
                   <div className="relative">
                     <input
                       type="text"
                       placeholder="dd-mm-yyyy"
                       maxLength={10}
-                      value={formData.arrival_at}
-                      onChange={(e) => handleDateChange(e, "arrival_at")}
+                      value={formData.source_start_at}
+                      onChange={(e) => handleDateChange(e, "source_start_at")}
                       className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
                     />
                     <input
-                         type="date"
-                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-                         id="picker-arrival_at"
-                         onChange={(e) => handlePickerChange(e, "arrival_at")}
+                      type="date"
+                      className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                      id="picker-source_start_at"
+                      onChange={(e) => handlePickerChange(e, "source_start_at")}
                     />
-                    <FiCalendar 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-                        onClick={() => document.getElementById("picker-arrival_at")?.showPicker()} 
+                    <FiCalendar
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                      onClick={() => document.getElementById("picker-source_start_at")?.showPicker()}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-500">Departure At</label>
+                  <label className="text-xs font-semibold text-gray-500">Destination End At</label>
                   <div className="relative">
                     <input
                       type="text"
                       placeholder="dd-mm-yyyy"
                       maxLength={10}
-                      value={formData.depature_at}
-                      onChange={(e) => handleDateChange(e, "depature_at")}
+                      value={formData.destination_end_at}
+                      onChange={(e) => handleDateChange(e, "destination_end_at")}
                       className="w-full border rounded-lg p-2 text-sm pr-8 bg-transparent"
                     />
                     <input
-                         type="date"
-                         className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-                         id="picker-depature_at"
-                         onChange={(e) => handlePickerChange(e, "depature_at")}
+                      type="date"
+                      className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                      id="picker-destination_end_at"
+                      onChange={(e) => handlePickerChange(e, "destination_end_at")}
                     />
-                    <FiCalendar 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
-                        onClick={() => document.getElementById("picker-depature_at")?.showPicker()} 
+                    <FiCalendar
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
+                      onClick={() => document.getElementById("picker-destination_end_at")?.showPicker()}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-500">Arrival Place</label>
+                  <label className="text-xs font-semibold text-gray-500">Source Start Place</label>
                   <input
-                    name="arrivals_place"
-                    placeholder="Arrival Place"
-                    value={formData.arrivals_place}
+                    name="source_start_place"
+                    placeholder="Source Start Place"
+                    value={formData.source_start_place}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-500">Departure Place</label>
+                  <label className="text-xs font-semibold text-gray-500">Destination End Place</label>
                   <input
-                    name="depature_place"
-                    placeholder="Departure Place"
-                    value={formData.depature_place}
+                    name="destination_end_place"
+                    placeholder="Destination End Place"
+                    value={formData.destination_end_place}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 text-sm"
                   />
@@ -792,6 +849,58 @@ export default function TourManagement() {
                   />
                 </div>
 
+
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-gray-500">Activities (comma-separated)</label>
+                  <input
+                    name="activities"
+                    placeholder="Desert Safari, Burj Khalifa, etc."
+                    value={Array.isArray(formData.tourjsondata?.activities) ? formData.tourjsondata.activities.join(', ') : ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      tourjsondata: {
+                        ...formData.tourjsondata,
+                        activities: e.target.value.split(',').map(a => a.trim()).filter(a => a)
+                      }
+                    })}
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Guide Name</label>
+                  <input
+                    name="guide"
+                    placeholder="John Doe"
+                    value={formData.tourjsondata?.guide || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      tourjsondata: {
+                        ...formData.tourjsondata,
+                        guide: e.target.value
+                      }
+                    })}
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Hotel Name</label>
+                  <input
+                    name="hotel"
+                    placeholder="JW Marriott"
+                    value={formData.tourjsondata?.hotel || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      tourjsondata: {
+                        ...formData.tourjsondata,
+                        hotel: e.target.value
+                      }
+                    })}
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+
                 <div className="col-span-2">
                   <label className="text-xs font-semibold text-gray-500">Image URL</label>
                   <div className="flex gap-2">
@@ -823,19 +932,20 @@ export default function TourManagement() {
                     />
                   </div>
                   {formData.tour_image_url && (
-                    <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 shrink-0">
+                    <div className="mt-3 relative w-32 h-32 rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100 hover:border-indigo-400 transition-all group">
                       <img
                         src={formData.tour_image_url}
-                        alt="Preview"
+                        alt="Main Tour Image"
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.target.style.display = 'none';
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="12"%3ENo Image%3C/text%3E%3C/svg%3E';
                         }}
                       />
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, tour_image_url: "" }))}
-                        className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70"
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-opacity shadow-lg"
+                        title="Remove image"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -846,15 +956,78 @@ export default function TourManagement() {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-gray-500">Description</label>
+                  <label className="text-xs font-semibold text-gray-500">Tour Description</label>
                   <textarea
                     name="tour_description"
-                    placeholder="Description"
+                    placeholder="Describe the tour..."
                     value={formData.tour_description}
                     onChange={handleChange}
-                    className="w-full border rounded-lg p-2 text-sm h-20"
+                    className="w-full border rounded-lg p-2 text-sm"
+                    rows="3"
                   />
                 </div>
+
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-gray-500">Tour Images</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => document.getElementById('tour-images-input').click()}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold border flex items-center justify-center gap-2 transition-colors ${uploading
+                          ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                          : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                        }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {uploading ? "Uploading..." : "Upload Images"}
+                    </button>
+                    <input
+                      id="tour-images-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleMultipleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Select multiple images (max 2MB each)</p>
+                  {formData.tour_images && formData.tour_images.length > 0 && (
+                    <div className="mt-3 grid grid-cols-4 gap-3">
+                      {formData.tour_images.map((imgUrl, idx) => (
+                        <div key={idx} className="relative group">
+                          <div className="relative w-full h-24 rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100 hover:border-indigo-400 transition-all">
+                            <img
+                              src={imgUrl}
+                              alt={`Tour ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="12"%3ENo Image%3C/text%3E%3C/svg%3E';
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({
+                                ...prev,
+                                tour_images: prev.tour_images.filter((_, i) => i !== idx)
+                              }))}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-opacity shadow-lg"
+                              title="Remove image"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 text-center truncate">Image {idx + 1}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               <div className="flex gap-3 pt-3">
