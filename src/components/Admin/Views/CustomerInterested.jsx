@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FiSearch, FiDownload } from "react-icons/fi";
+import { FiSearch, FiDownload, FiInbox } from "react-icons/fi";
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -180,8 +180,8 @@ export default function CustomerInterested() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm relative">
+    <div className="h-[calc(100vh-75px)] flex flex-col">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm relative flex-1 flex flex-col min-h-0">
         <div className="sticky top-0 z-30 bg-white flex flex-col sm:flex-row justify-between items-center p-6 py-3 border-b bg-gradient-to-r from-gray-50 to-white gap-4">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">Interested Candidates</h2>
 
@@ -210,7 +210,17 @@ export default function CustomerInterested() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 scrollbar-hide">
+          {loading ? (
+            <div className="text-center py-6">Loading...</div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                <div className="bg-gray-50 p-6 rounded-full mb-4">
+                    <FiInbox className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">No records found</h3>
+            </div>
+          ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-100 border-b">
               <tr>
@@ -225,16 +235,7 @@ export default function CustomerInterested() {
             </thead>
 
             <tbody className="bg-white divide-y divide-gray-200">
-              {loading && (
-                <tr>
-                  <td colSpan="7" className="text-center py-6">
-                    Loading...
-                  </td>
-                </tr>
-              )}
-
-              {!loading &&
-                filteredCustomers.map((c, i) => (
+              {filteredCustomers.map((c, i) => (
                   <tr key={c.id || i} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-center">{(currentPage - 1) * pagination.page_size + i + 1}</td>
                     <td className="px-4 py-3 text-center font-medium text-gray-900 max-w-[200px] overflow-hidden text-ellipsis">{c.name}</td>
@@ -251,11 +252,13 @@ export default function CustomerInterested() {
                 ))}
             </tbody>
           </table>
+          )}
         </div>
 
-      </div>
+
 
       {/* ================= PAGINATION CONTROLS ================= */}
+      {filteredCustomers.length > 0 && !loading && (
       <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t gap-4">
         <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
           Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
@@ -302,6 +305,8 @@ export default function CustomerInterested() {
           </button>
         </div>
         <div className="hidden sm:block order-3"></div>
+      </div>
+      )}
       </div>
       <DownloadModal
         isOpen={showDownloadModal}

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { FiX, FiCalendar } from "react-icons/fi";
+import { FiX, FiCalendar, FiInbox } from "react-icons/fi";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
 import { useConfirm } from "../../../context/ConfirmContext";
@@ -492,6 +492,14 @@ export default function TourManagement() {
         </div>
       </div>
 
+      {filteredTours.length === 0 && !loading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+             <div className="bg-gray-50 p-6 rounded-full mb-4">
+                 <FiInbox className="w-10 h-10 text-gray-400" />
+             </div>
+             <h3 className="text-lg font-medium text-gray-900">No records found</h3>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
         {filteredTours.map((tour) => (
           <div
@@ -553,8 +561,10 @@ export default function TourManagement() {
           </div>
         ))}
       </div>
+      )}
 
       {/* ================= PAGINATION CONTROLS ================= */}
+      {filteredTours.length > 0 && (
       <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t border-gray-200 bg-white rounded-xl shadow-sm gap-4">
         <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
           Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
@@ -615,6 +625,7 @@ export default function TourManagement() {
         </div>
         <div className="hidden sm:block order-3"></div>
       </div>
+      )}
 
       {/* CREATE TOUR MODAL */}
       {showCreateModal && (

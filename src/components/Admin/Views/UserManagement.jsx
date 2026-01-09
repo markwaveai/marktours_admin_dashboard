@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle, FiArrowUp, FiArrowDown, FiFilter } from "react-icons/fi";
+import PropTypes from 'prop-types';
+import { FiEdit, FiTrash2, FiSearch, FiX, FiEye, FiEyeOff, FiCopy, FiCheck, FiLoader, FiList, FiClock, FiCheckCircle, FiXCircle, FiArrowUp, FiArrowDown, FiFilter, FiInbox } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
 import { useToast } from "../../../context/ToastContext";
@@ -16,11 +17,12 @@ const maskMobile = (mobile) => {
 };
 
 // export default function UserManagement() {
-export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
+export default function UserManagement({ setIsModalOpen, isSidebarOpen, activeTab }) {
   const { addToast } = useToast();
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -31,7 +33,9 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
+
   const [usersCache, setUsersCache] = useState({});
+  const [searchCache, setSearchCache] = useState({});
   const [pagination, setPagination] = useState({
     total_records: 0,
     total_pages: 0,
@@ -56,20 +60,49 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
   const [usersData, setUsersData] = useState([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All"); // All, Pending, Approved, Rejected
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce Search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      if (search !== debouncedSearch) {
+        setCurrentPage(1); // Reset to page 1 on new search
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+  const [statusFilter, setStatusFilter] = useState(() => {
+    return sessionStorage.getItem("user_statusFilter") || "All";
+  }); // All, Pending, Approved, Rejected
+
+  // Filter Counts State
+  const [filterCounts, setFilterCounts] = useState({
+    All: 0,
+    Pending: 0,
+    Approved: 0,
+    Rejected: 0
+  });
+  
+  const statusFilterRef = useRef(statusFilter);
+  useEffect(() => { statusFilterRef.current = statusFilter; }, [statusFilter]);
 
   // Filter State
   const [showFilter, setShowFilter] = useState(false);
-  const [filters, setFilters] = useState({
-    activeStatus: true, // Toggle Switch
-    bookingStatus: "", // 'Booked' | 'Not Booked' | 'All' / ''
-    tourCode: "",
-    branch: ""
+  const [filters, setFilters] = useState(() => {
+    const saved = sessionStorage.getItem("user_filters");
+    return saved ? JSON.parse(saved) : {
+      activeStatus: true,
+      agentId: "",
+      tourCode: "",
+      branch: ""
+    };
   });
 
   const [tempFilters, setTempFilters] = useState({
     activeStatus: true,
-    bookingStatus: "",
+    agentId: "",
     tourCode: "",
     branch: ""
   });
@@ -86,6 +119,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
   const applyFilters = () => {
     setFilters(tempFilters);
+    setCurrentPage(1); // Reset to page 1 when filtering
     setShowFilter(false);
   };
 
@@ -96,7 +130,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const clearFilters = () => {
     setTempFilters({
       activeStatus: true,
-      bookingStatus: "",
+      agentId: "",
       tourCode: "",
       branch: ""
     });
@@ -133,8 +167,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   const [showForm, setShowForm] = useState(false);
   const [originalUser, setOriginalUser] = useState(null);
 
-  // Tab State
-  const [activeTab] = useState("User Management");
+
   useEffect(() => {
     if (setIsModalOpen) setIsModalOpen(showForm);
   }, [showForm, setIsModalOpen]);
@@ -207,6 +240,9 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
   useEffect(() => {
     const fetchAgents = async () => {
+      // Only fetch if form is open
+      if (!showForm) return;
+
       // Check session storage first
       const cachedAgents = sessionStorage.getItem("agentsList");
       if (cachedAgents) {
@@ -224,7 +260,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       } catch (e) { console.error("Failed to fetch agents", e); }
     };
     fetchAgents();
-  }, []);
+  }, [showForm]);
 
   const emptyForm = {
     user_id: null,
@@ -257,111 +293,319 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
     }
   }, [viewImg]);
 
-  /* ================= FETCH USERS ================= */
-  const fetchUsers = async (page = 1) => {
-    // Check cache first
-    if (usersCache[page]) {
-      setUsersData(usersCache[page]);
-      setLoading(false);
-      return;
-    }
+  const fetchUsers = async (forceRefresh = false) => {
+    // Ensure we are on the correct tab before fetching
+    if (activeTab && activeTab !== "User Management") return;
 
-    // Deduplicate requests
-    if (fetchingRef.current === page) return;
-    fetchingRef.current = page;
+
+    // Abort previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/user-details/user-tour-summary?is_active=true&page=${page}&size=15`);
-      const data = await res.json();
+      let data, newDataPagination;
 
-      if (data.data) {
-        setUsersData(data.data || []);
-        setPagination({
-          total_records: data.total_records || data.pagination?.total_records || 0,
-          total_pages: data.total_pages || data.pagination?.total_pages || 1,
-          page_size: 15
+      // SEARCH MODE
+      if (debouncedSearch) {
+         const searchKey = `search_${debouncedSearch}_${currentPage}_${forceRefresh ? 'fresh' : 'cache'}`;
+         
+         if (!forceRefresh && searchCache[searchKey]) {
+             const cached = searchCache[searchKey];
+             setUsersData(cached.list);
+             setPagination(cached.pagination);
+             setLoading(false);
+             return;
+         }
+
+         const res = await fetch(`${BASE_URL}/transactions/search?data=${encodeURIComponent(debouncedSearch)}&page=${currentPage}&page_size=15`, { signal });
+         if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+         data = await res.json();
+         console.log("Search Response:", data);
+         newDataPagination = {
+             total_records: data.total_records || 0,
+             total_pages: data.total_pages || 1,
+             page_size: 15
+         };
+
+         // Update Search Cache
+         if (!forceRefresh) {
+             setSearchCache(prev => ({
+                 ...prev,
+                 [searchKey]: {
+                     list: [], // Will fill after processing
+                     pagination: newDataPagination
+                 }
+             }));
+         }
+
+      } else {
+        // STANDARD FETCH MODE
+        const queryParams = new URLSearchParams({
+            page: forceRefresh ? 1 : currentPage,
+            page_size: 15,
+            user_status: filters.activeStatus // "true" or "false"
         });
 
-        // Update cache
-        setUsersCache(prev => ({
-          ...prev,
-          [page]: data.data || []
-        }));
+        // Status Filter - only append if a specific status is selected
+        if (statusFilter !== "All") {
+            queryParams.append("status", statusFilter.toUpperCase());
+            sessionStorage.setItem("user_statusFilter", statusFilter);
+        } else {
+            sessionStorage.removeItem("user_statusFilter");
+        }
+
+        // Advanced Filters
+        if (filters.agentId) queryParams.append("agent_id", filters.agentId);
+        if (filters.tourCode) queryParams.append("tour_code", filters.tourCode);
+        if (filters.branch) queryParams.append("branch", filters.branch);
+
+        sessionStorage.setItem("user_filters", JSON.stringify(filters));
+
+        const queryString = queryParams.toString();
+
+        // Check Cache
+        if (!forceRefresh && usersCache[queryString]) {
+            const cachedData = usersCache[queryString];
+            setUsersData(cachedData.list);
+            setPagination(cachedData.pagination);
+            
+            setFilterCounts(prev => ({
+            ...prev,
+            [statusFilter]: cachedData.pagination.total_records
+            }));
+
+            setLoading(false);
+            return;
+        }
+
+        const res = await fetch(`${BASE_URL}/user-details/detailed?${queryString}`, { signal });
+        data = await res.json();
+        
+        // Ensure accurate total_records for single page results
+        const apiTotalPages = data.pagination?.total_pages || 1;
+        let apiTotalRecords = data.pagination?.total_records || 0;
+
+        newDataPagination = {
+             total_records: apiTotalRecords,
+             total_pages: apiTotalPages,
+             page_size: 15
+        };
       }
+
+      // Flatten nested structure (User -> Transactions)
+      const usersList = [];
+      const rawUsers = data.users || data.data || [];
+      
+      rawUsers.forEach(u => {
+          if (u.transactions && u.transactions.length > 0) {
+              u.transactions.forEach(tx => {
+                  // FILTER: Only add transactions that match the current status filter
+                  if (statusFilter !== "All" && (tx.status || "PENDING").toUpperCase() !== statusFilter.toUpperCase()) {
+                    return;
+                  }
+
+                  usersList.push({
+                      ...tx, // tour_code, status, amount, tx_id, remarks
+                      user_id: u.user_id,
+                      agent_id: u.agent_id,
+                      user_detail: {
+                          name: u.name,
+                          mobile: u.mobile,
+                          email: u.email,
+                          branch: u.branch,
+                          user_id: u.user_id,
+                          agent_id: u.agent_id
+                      },
+                      booking: (u.bookings || []).find(b => b.tour_code === tx.tour_code) || {}
+                  });
+              });
+          } else {
+             // Include users with no transactions
+             usersList.push({
+                 user_id: u.user_id,
+                 agent_id: u.agent_id,
+                 user_detail: {
+                     name: u.name,
+                     mobile: u.mobile,
+                     email: u.email,
+                     branch: u.branch,
+                     user_id: u.user_id,
+                     agent_id: u.agent_id
+                 },
+                 booking: {},
+                 tour_code: "-",
+                 status: "N/A",
+                 amount: 0,
+                 tx_id: `u-${u.user_id}` 
+             });
+          }
+      });
+    
+    // Deduplicate: Ensure only one row per (user_id + tour_code), prioritizing 'PENDING'
+    const uniqueMap = new Map();
+    usersList.forEach(item => {
+      const key = `${item.user_id}-${(item.tour_code || '').trim()}`;
+      
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
+      } else {
+        const existing = uniqueMap.get(key);
+        // If existing is not PENDING but new one IS, swap it to show the action item
+        if (existing.status !== 'PENDING' && item.status === 'PENDING') {
+           uniqueMap.set(key, item);
+        }
+      }
+    });
+
+    const uniqueUsersList = Array.from(uniqueMap.values());
+    
+    let apiTotalRecords = data.pagination?.total_records || data.total_records || 0;
+    const apiTotalPages = data.pagination?.total_pages || data.total_pages || 1;
+
+    // Use row count as total if single page, effectively counting transactions
+    if (apiTotalPages === 1) {
+        apiTotalRecords = uniqueUsersList.length;
+    }
+    
+    const newPagination = {
+      total_records: apiTotalRecords,
+      total_pages: apiTotalPages,
+      page_size: 15
+    };
+
+    setUsersData(uniqueUsersList);
+    setPagination(newPagination);
+
+    // Update appropriate cache
+    if (!forceRefresh) {
+        if (debouncedSearch) {
+             const searchKey = `search_${debouncedSearch}_${currentPage}_${forceRefresh ? 'fresh' : 'cache'}`;
+             setSearchCache(prev => ({
+                 ...prev,
+                 [searchKey]: {
+                     list: uniqueUsersList,
+                     pagination: newPagination
+                 }
+             }));
+        } else {
+            // Standard cache update (from existing logic)
+             const queryParams = new URLSearchParams({
+                page: forceRefresh ? 1 : currentPage,
+                page_size: 15,
+                user_status: filters.activeStatus
+            });
+            if (statusFilter !== "All") queryParams.append("status", statusFilter.toUpperCase());
+            if (filters.agentId) queryParams.append("agent_id", filters.agentId);
+            if (filters.tourCode) queryParams.append("tour_code", filters.tourCode);
+            if (filters.branch) queryParams.append("branch", filters.branch);
+            
+            const qs = queryParams.toString();
+            setUsersCache(prev => ({
+                 ...prev,
+                 [qs]: {
+                     list: uniqueUsersList,
+                     pagination: newPagination
+                 }
+             }));
+             
+            // Update Filter Counts only for standard fetch
+            setFilterCounts(prev => ({
+                ...prev,
+                [statusFilter]: newPagination.total_records
+            }));
+        }
+    }
+
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error("Failed to fetch users", error);
+      addToast("Failed to load data", "error");
     } finally {
-      setLoading(false);
-      fetchingRef.current = null;
+      if (!signal.aborted) {
+         setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchUsers(currentPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
-
-  // Refresh current page (bypassing cache if needed, e.g., after edit/delete)
-  const refreshCurrentPage = async () => {
-    const page = currentPage;
-    // Invalidate cache for this page to force a refresh
-    setUsersCache(prev => {
-      const newCache = { ...prev };
-      delete newCache[page];
-      return newCache;
-    });
-    // We need to call fetch explicitly after cache invalidation logic is settled 
-    // or just force fetch. For simplicity, let's just force fetch logic:
-    try {
-      const res = await fetch(`${BASE_URL}/user-details/user-tour-summary?is_active=true&page=${page}&size=15`);
-      const data = await res.json();
-      if (data.data) {
-        setUsersData(data.data || []);
-        setPagination({
-          total_records: data.total_records || data.pagination?.total_records || 0,
-          total_pages: data.total_pages || data.pagination?.total_pages || 1,
-          page_size: 15
-        });
-        setUsersCache(prev => ({
-          ...prev,
-          [page]: data.data || []
-        }));
-      }
-    } catch (error) {
-      console.error("Failed to refresh users", error);
+    if (activeTab === "User Management") {
+      fetchUsers();
     }
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, statusFilter, filters, debouncedSearch]);
+
+  // Fetch counts for all statuses when filters change and auto-refresh every 5 mins
+  const refreshFilterCounts = async () => {
+    const statuses = ["All", "Pending", "Approved", "Rejected"];
+    const countUpdates = {};
+
+    await Promise.all(statuses.map(async (status) => {
+      // Skip the currently active filter, as fetchUsers handles its count more accurately (row-based)
+      if (status === statusFilterRef.current) return;
+
+      try {
+        const queryParams = new URLSearchParams({
+          page: 1,
+          page_size: 1,
+          user_status: filters.activeStatus
+        });
+
+        if (status !== "All") {
+          queryParams.append("status", status.toUpperCase());
+        }
+        if (filters.agentId) queryParams.append("agent_id", filters.agentId);
+        if (filters.tourCode) queryParams.append("tour_code", filters.tourCode);
+        if (filters.branch) queryParams.append("branch", filters.branch);
+
+        const res = await fetch(`${BASE_URL}/user-details/detailed?${queryParams.toString()}`);
+        const data = await res.json();
+        countUpdates[status] = data.pagination?.total_records || data.total_records || 0;
+      } catch (e) {
+        console.error(`Failed to fetch count for ${status}`, e);
+      }
+    }));
+    
+    setFilterCounts(prev => ({ ...prev, ...countUpdates }));
   };
 
-  /* ================= FILTER LOGIC ================= */
-  const filteredUsers = usersData.filter((u) => {
-    const s = search.toLowerCase();
-    const matchesSearch = (
-      (u.name && u.name.toLowerCase().includes(s)) ||
-      (u.email && u.email.toLowerCase().includes(s)) ||
-      (u.mobile && String(u.mobile).includes(s))
-    );
-
-    let matchesStatus = true;
-    if (statusFilter !== "All") {
-      const status = u.booking_status || "Pending";
-      if (statusFilter === "Approved") {
-        matchesStatus = status === "Confirmed";
-      } else if (statusFilter === "Pending") {
-        matchesStatus = status === "Pending";
-      } else if (statusFilter === "Rejected") {
-        matchesStatus = status === "Rejected" || status === "Cancelled";
-      }
+  useEffect(() => {
+    if (activeTab === "User Management") {
+      refreshFilterCounts();
+      const intervalId = setInterval(refreshFilterCounts, 300000);
+      return () => clearInterval(intervalId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, filters.activeStatus]);
 
-    return matchesSearch && matchesStatus;
-  });
+  // Refresh current page (bypassing cache if needed, e.g., after edit/delete)
+  // Refresh current page
+  const refreshCurrentPage = () => {
+    fetchUsers(true);
+  };
+
+  /* ================= FILTER LOGIC (Server-side now) ================= */
+  const filteredUsers = usersData;
+
+  // Helper to get nested value
+  const getNestedValue = (obj, path) => {
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+  };
 
   const sortedUsers = [...filteredUsers].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
 
-    let aVal = a[sortConfig.key];
-    let bVal = b[sortConfig.key];
+    let aVal = getNestedValue(a, sortConfig.key);
+    let bVal = getNestedValue(b, sortConfig.key);
 
     // Handle nulls/undefined
     if (aVal === null || aVal === undefined) aVal = '';
@@ -474,105 +718,101 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
   /* ================= STATUS UPDATE ================= */
   /* ================= STATUS UPDATE ================= */
   const handleStatusUpdate = async (user, status) => {
-    const result = await confirm({
-      title: `${status === 'Confirmed' ? 'Confirm Approval' : 'Reject User'}?`,
-      message: status === 'Confirmed'
-        ? "Are you sure you want to approve this transaction?"
-        : "Please provide a reason for rejecting this user.",
-      confirmText: status === 'Confirmed' ? "Approve" : "Reject",
-      type: status === 'Confirmed' ? "success" : "danger",
-      showInput: status !== 'Confirmed',
-      inputPlaceholder: "Enter rejection remark..."
-    });
+  const result = await confirm({
+    title: `${status === 'Confirmed' ? 'Confirm Approval' : 'Reject User'}?`,
+    message: status === 'Confirmed'
+      ? "Are you sure you want to approve this transaction?"
+      : "Please provide a reason for rejecting this user.",
+    confirmText: status === 'Confirmed' ? "Approve" : "Reject",
+    type: status === 'Confirmed' ? "success" : "danger",
+    showInput: status !== 'Confirmed',
+    inputPlaceholder: "Enter rejection remark..."
+  });
 
-    if (!result || (typeof result === 'object' && !result.confirmed)) return;
+  if (!result || (typeof result === 'object' && !result.confirmed)) return;
 
-    // Transaction Logic for 'Confirmed' or 'Rejected' status
-    if (status === 'Confirmed' || status === 'Rejected') {
-      try {
+  // Transaction Logic for 'Confirmed' or 'Rejected' status
+  if (status === 'Confirmed' || status === 'Rejected') {
+    try {
+      let txId = user.tx_id || user.id; // Use direct ID if available from the new table structure
+
+      if (!txId) {
+        // Fallback: Fetch pending transactions if tx_id is missing (should be rare now)
         const txUrl = `${BASE_URL}/transactions/user/${user.user_id}?status=PENDING&page=1&page_size=1`;
-        console.log("Fetching pending transactions from:", txUrl);
         const txRes = await fetch(txUrl);
         const txData = await txRes.json();
-        console.log("Transaction API Response:", txData);
-        
-        // Flexible data extraction
         const txList = txData.data || txData.transactions || txData.results || (Array.isArray(txData) ? txData : []);
-        const pendingTx = txList && txList[0]; 
-        
-        if (pendingTx) {
-          console.log("Found pending transaction:", pendingTx);
-          const txId = pendingTx.tx_id || pendingTx.id || pendingTx.transaction_id;
-          const { utr_no, utr_image_url, emi_month } = pendingTx;
-          
-          if (txId) {
-             console.log(`Updating transaction ID: ${txId} to ${status === 'Confirmed' ? 'APPROVED' : 'REJECTED'}`);
-             const approveTxRes = await fetch(`${BASE_URL}/transactions/${txId}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({
-                 status: status === 'Confirmed' ? "APPROVED" : "REJECTED",
-                 utr_no: utr_no || "string",
-                 utr_image_url: utr_image_url || "string",
-                 emi_month: Number(emi_month) || 0
-               })
-             });
-
-             if (!approveTxRes.ok) {
-               const txErr = await approveTxRes.text();
-               console.error("Transaction Update Failed:", txErr);
-               addToast("Failed to update transaction status.", "error");
-               return; 
-             }
-             addToast(status === 'Confirmed' ? "Pending transaction approved." : "Pending transaction rejected.", "success");
-          } else {
-             console.warn("Transaction found but no valid ID (tx_id/id) present.");
-          }
-        } else {
-           console.log("No pending transactions found for user.");
-           addToast("NO PENDING EMI FOUND", "error");
-           return;
-        }
-      } catch (e) {
-        console.error("Error checking transactions:", e);
-        addToast("Error verifying transactions. Check console.", "error");
-        return; 
+        const pendingTx = txList && txList[0];
+        txId = pendingTx?.tx_id || pendingTx?.id || pendingTx?.transaction_id;
       }
-    }
+      
+      if (txId) {
+         const approveTxRes = await fetch(`${BASE_URL}/transactions/${txId}`, {
+           method: "PUT",
+           headers: { "Content-Type": "application/json" },
+           body: JSON.stringify({
+             status: status === 'Confirmed' ? "APPROVED" : "REJECTED",
+             remarks: status === 'Rejected' ? result.value : undefined
+           })
+         });
 
-    const payload = {
-      ...user,
-      booking_status: status,
-      is_active: status === 'Confirmed', // Optionally auto-activate on confirm
-      // Ensure agent_id is a number
-      agent_id: user.agent_id ? Number(user.agent_id) : AGENT_ID,
-      remark: result.value || ""
-    };
-
-    try {
-      const res = await fetch(`${BASE_URL}/user-details/${user.user_id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        if (status === 'Confirmed') {
-          addToast("Transaction Confirmed Successfully", "success");
-        } else {
-          addToast(`User ${status} successfully`, "success"); // Reject case
-        }
-        refreshCurrentPage();
-        handleOpenTransactionModal(user);
-      } else {
-        const err = await res.json();
-        addToast(`Failed: ${err.detail || "Update failed"}`, "error");
+         if (!approveTxRes.ok) {
+           const txErr = await approveTxRes.text();
+           console.error("Transaction Update Failed:", txErr);
+           addToast("Failed to update transaction status.", "error");
+           return; 
+         }
+         
+         // Success
+         addToast(status === 'Confirmed' ? "Transaction Approved Successfully" : "Transaction Rejected Successfully", "success");
+         refreshCurrentPage();
+         refreshFilterCounts();
+         return; // Skip legacy user-details update
       }
     } catch (e) {
-      console.error("Status update error", e);
-      addToast("Failed to update status", "error");
+      console.error("Error updating transaction:", e);
+      addToast("Error verifying transactions. Check console.", "error");
+      return; 
     }
+  }
+
+  const payload = {
+    ...user,
+    booking_status: status,
+    is_active: status === 'Confirmed', // Optionally auto-activate on confirm
+    // Ensure agent_id is a number
+    agent_id: user.agent_id ? Number(user.agent_id) : AGENT_ID,
+    remark: result.value || ""
   };
+
+  try {
+    // Note: This endpoint might update the User metadata, but if the main action was Transaction,
+    // we might not Strictly NEED this if the Transaction API handles everything. 
+    // But keeping it for legacy data consistency as requested.
+    const res = await fetch(`${BASE_URL}/user-details/${user.user_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      if (status === 'Confirmed') {
+        addToast("Transaction Approved Successfully", "success");
+      } else {
+        addToast("Transaction Rejected Successfully", "success");
+      }
+      refreshCurrentPage();
+      refreshFilterCounts();
+      // handleOpenTransactionModal(user); // Removed as main table has details
+    } else {
+      const err = await res.json();
+      addToast(`Failed: ${err.detail || "Update failed"}`, "error");
+    }
+  } catch (e) {
+    console.error("Status update error", e);
+    addToast("Failed to update status", "error");
+  }
+};
 
   /* ================= DELETE ================= */
   const handleDelete = async (id) => {
@@ -962,7 +1202,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
       )}
 
       {activeTab === "User Management" ? (
-        <div className="flex flex-col">
+        <div className="flex flex-col h-[calc(100vh-75px)] bg-white rounded-xl shadow border border-gray-200">
           {/* Header */}
           <div className="sticky top-0 z-50 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4 shadow-sm">
             <div className="flex flex-col gap-4 w-[96vw] sm:w-auto p-4 sm:p-0 -mb-5 sm:mb-0 -mt-5 sm:mt-0">
@@ -987,7 +1227,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                   return (
                     <div
                       key={status}
-                      onClick={() => setStatusFilter(status)}
+                      onClick={() => { setStatusFilter(status); setCurrentPage(1); }}
                       className={`
                         px-4 py-2 sm:px-4 sm:py-3 rounded-lg border cursor-pointer transition-all shadow-sm flex items-center justify-center font-semibold text-sm gap-2
                         min-w-[100px] sm:min-w-[120px] text-center whitespace-nowrap flex-shrink-0
@@ -1001,7 +1241,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                       <span className={`
                         text-base px-2 py-0.5 rounded-full ml-1
                         ${statusFilter === status ? "bg-white/20" : "bg-gray-100 text-gray-500"}
-                      `}>{status === "All" ? pagination.total_records : 0}</span>
+                      `}>{filterCounts[status] || 0}</span>
                     </div>
                   )
                 })}
@@ -1029,7 +1269,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
 
                     <div className="
                         fixed inset-x-4 top-[15%] max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-200
-                        sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-none
+                        sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-[80vh]
                       ">
                       <div className="flex justify-between items-center mb-4 pb-2 border-b">
                         <h4 className="font-bold text-gray-700 text-sm">Filters</h4>
@@ -1053,23 +1293,15 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                           <span className="text-xs text-gray-500 w-12 text-right">{tempFilters.activeStatus ? "Active" : "Inactive"}</span>
                         </div>
 
-                        {/* Booking Status */}
+                        {/* Agent ID */}
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Booking Status</label>
-                          <div className="flex gap-2">
-                            {['All', 'Booked', 'Not Booked'].map(opt => (
-                              <button
-                                key={opt}
-                                onClick={() => handleTempFilterChange("bookingStatus", opt === 'All' ? "" : opt)}
-                                className={`px-3 py-1.5 text-xs rounded-lg border transition-all flex-1 whitespace-nowrap ${(opt === 'All' && !tempFilters.bookingStatus) || tempFilters.bookingStatus === opt
-                                  ? "bg-indigo-50 border-indigo-600 text-indigo-700 font-medium"
-                                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                  }`}
-                              >
-                                {opt}
-                              </button>
-                            ))}
-                          </div>
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Agent ID</label>
+                          <input
+                            value={tempFilters.agentId}
+                            onChange={(e) => handleTempFilterChange("agentId", e.target.value)}
+                            placeholder="Enter Agent ID..."
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+                          />
                         </div>
 
                         {/* Tour Code */}
@@ -1146,56 +1378,66 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
           </div>
 
           {/* ================= TABLE WRAPPER ================= */}
-          <div className="overflow-x-auto no-scrollbar max-h-[70vh] overflow-y-auto border-b border-gray-200">
+          <div className="overflow-x-auto scrollbar-hide flex-1 overflow-y-auto border-b border-gray-200 min-h-0">
+            {sortedUsers.length === 0 && !loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                  <div className="bg-gray-50 p-6 rounded-full mb-4">
+                      <FiInbox className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900">No records found</h3>
+              </div>
+            ) : (
             <table className="w-full text-sm border-separate border-spacing-0">
               <thead className="sticky top-0 z-40 bg-gray-100">
                 <tr className="bg-gray-100">
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-0 z-40 bg-gray-100 min-w-[60px] border-b border-gray-200">
                     S.No
                   </th>
-                  <th onClick={() => handleSort('name')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[60px] z-40 bg-gray-100 min-w-[150px] border-b border-gray-200 cursor-pointer group">
-                    <div className="flex items-center justify-center">Name <SortIcon columnKey="name" /></div>
+                  <th onClick={() => handleSort('user_detail.name')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[60px] z-40 bg-gray-100 min-w-[150px] border-b border-gray-200 cursor-pointer group">
+                    <div className="flex items-center justify-center">Name <SortIcon columnKey="user_detail.name" /></div>
                   </th>
-                  <th onClick={() => handleSort('mobile')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[210px] z-40 bg-gray-100 min-w-[130px] border-b border-r border-gray-200 cursor-pointer group">
-                    <div className="flex items-center justify-center">Mobile <SortIcon columnKey="mobile" /></div>
+                  <th onClick={() => handleSort('user_detail.mobile')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase sm:sticky left-[210px] z-40 bg-gray-100 min-w-[130px] border-b border-r border-gray-200 cursor-pointer group">
+                    <div className="flex items-center justify-center">Mobile <SortIcon columnKey="user_detail.mobile" /></div>
                   </th>
                   <th onClick={() => handleSort('user_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
                     <div className="flex items-center justify-center">User ID <SortIcon columnKey="user_id" /></div>
                   </th>
-                  <th onClick={() => handleSort('email')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
-                    <div className="flex items-center justify-center">Email <SortIcon columnKey="email" /></div>
+                  <th onClick={() => handleSort('user_detail.email')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Email <SortIcon columnKey="user_detail.email" /></div>
                   </th>
                   <th onClick={() => handleSort('agent_id')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
                     <div className="flex items-center justify-center">Agent ID <SortIcon columnKey="agent_id" /></div>
                   </th>
-                  <th onClick={() => handleSort('branch')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
-                    <div className="flex items-center justify-center">Branch <SortIcon columnKey="branch" /></div>
+                  <th onClick={() => handleSort('user_detail.branch')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 cursor-pointer group">
+                    <div className="flex items-center justify-center">Branch <SortIcon columnKey="user_detail.branch" /></div>
                   </th>
-                  <th onClick={() => handleSort('tour_name')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[200px] cursor-pointer group">
-                    <div className="flex items-center justify-center">Tour Name <SortIcon columnKey="tour_name" /></div>
-                  </th>
+                  {/* <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[200px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Tour Name</div>
+                  </th> */}
                   <th onClick={() => handleSort('tour_code')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
                     <div className="flex items-center justify-center">Tour Code <SortIcon columnKey="tour_code" /></div>
                   </th>
-                  <th onClick={() => handleSort('emi_per_month')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center">EMI / Month <SortIcon columnKey="emi_per_month" /></div>
+                  <th onClick={() => handleSort('amount')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">EMI Amount <SortIcon columnKey="amount" /></div>
                   </th>
-                  <th onClick={() => handleSort('amount_paid')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center">Paid <SortIcon columnKey="amount_paid" /></div>
+                  <th onClick={() => handleSort('booking.amount_paid')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Paid <SortIcon columnKey="booking.amount_paid" /></div>
                   </th>
-                  <th onClick={() => handleSort('amount_remaining')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center">Remaining <SortIcon columnKey="amount_remaining" /></div>
+                  <th onClick={() => handleSort('booking.amount_remaining')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center">Remaining <SortIcon columnKey="booking.amount_remaining" /></div>
                   </th>
-                  <th onClick={() => handleSort('booking_status')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
-                    <div className="flex items-center justify-center"> Status <SortIcon columnKey="booking_status" /></div>
+                  <th onClick={() => handleSort('status')} className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px] cursor-pointer group">
+                    <div className="flex items-center justify-center"> Status <SortIcon columnKey="status" /></div>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Transaction</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Action</th>
+                  { !["Approved", "Rejected"].includes(statusFilter) && (
+                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase border-b border-gray-200 bg-gray-100 min-w-[100px]">Action</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedUsers.map((u, i) => (
-                  <React.Fragment key={u.user_id}>
+                  <React.Fragment key={u.tx_id || `${u.user_id}-${i}`}>
                     <tr
                       onClick={() => toggleRow(u)}
                       className={`cursor-pointer transition-colors text-sm group
@@ -1203,28 +1445,35 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                   `}
                     >
                       <td className={`px-4 py-3 text-center sm:sticky left-0 z-10 min-w-[60px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{(currentPage - 1) * pagination.page_size + i + 1}</td>
-                      <td className={`px-4 py-3 text-center sm:sticky left-[60px] z-10 min-w-[150px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.name}</td>
-                      <td className={`px-4 py-3 text-center sm:sticky left-[210px] z-10 min-w-[130px] border-b border-r border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.mobile}</td>
+                      <td className={`px-4 py-3 text-center sm:sticky left-[60px] z-10 min-w-[150px] border-b border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.user_detail?.name || "-"}</td>
+                      <td className={`px-4 py-3 text-center sm:sticky left-[210px] z-10 min-w-[130px] border-b border-r border-gray-100 ${expandedUserId === u.user_id ? "bg-blue-50" : "bg-white group-hover:bg-gray-50"}`}>{u.user_detail?.mobile || "-"}</td>
                       <td className="px-4 py-3 text-center font-mono text-gray-500 border-b border-gray-100 italic">{u.user_id}</td>
-                      <td className="px-4 py-3 text-center border-b border-gray-100">{u.email}</td>
+                      <td className="px-4 py-3 text-center border-b border-gray-100">{u.user_detail?.email || "-"}</td>
                       <td className="px-4 py-3 text-center font-mono text-gray-600 border-b border-gray-100">{u.agent_id || "N/A"}</td>
 
-                      <td className="px-4 py-3 text-center">{u.branch}</td>
-                      <td className="px-4 py-3 text-center">{u.tour_name || "-"}</td>
+                      <td className="px-4 py-3 text-center">{u.user_detail?.branch || "-"}</td>
+                      {/* <td className="px-4 py-3 text-center">-</td> */}
                       <td className="px-4 py-3 text-center">{u.tour_code || "-"}</td>
-                      <td className="px-4 py-3 text-center">{u.emi_per_month || "-"}</td>
-                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.amount_paid ? Number(u.amount_paid).toFixed(3) : "-"}</td>
-                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.amount_remaining ? Number(u.amount_remaining).toFixed(3) : "-"}</td>
+                      <td className="px-4 py-3 text-center">{u.amount ? Number(u.amount).toFixed(2) : "-"}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{u.booking?.amount_paid ? Number(u.booking.amount_paid).toFixed(2) : "-"}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-medium">{u.booking?.amount_remaining ? Number(u.booking.amount_remaining).toFixed(2) : "-"}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${u.booking_status === 'Confirmed' ? 'text-green-800 bg-green-100' : 'text-orange-500 bg-yellow-100'}`}>
-                          {u.booking_status || "Pending"}
+                        <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${['APPROVED', 'COMPLETED', 'SUCCESS'].includes((u.status || '').toUpperCase()) ? 'text-green-800 bg-green-100' : ((u.status || '').toUpperCase() === 'REJECTED' ? 'text-red-800 bg-red-100' : 'text-orange-500 bg-yellow-100')}`}>
+                          {u.status || "PENDING"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenTransactionModal(u);
+                            handleOpenTransactionModal({
+                              ...(u.user_detail || {}),
+                              user_id: u.user_id,
+                              emi_per_month: u.amount,
+                              amount_paid: u.booking?.amount_paid,
+                              amount_remaining: u.booking?.amount_remaining,
+                              tx_id: u.tx_id
+                            });
                           }}
                           className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg transition-colors group/btn"
                           title="View Transactions"
@@ -1232,28 +1481,35 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                           <FiList className="w-4 h-4" />
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusUpdate(u, "Confirmed");
-                            }}
-                            className="bg-green-100 text-green-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-green-200 transition-colors"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStatusUpdate(u, "Rejected");
-                            }}
-                            className="bg-red-100 text-red-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-red-200 transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </td>
+                      { !["Approved", "Rejected"].includes(statusFilter) && (
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center gap-2">
+                            {u.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusUpdate(u, "Confirmed");
+                                  }}
+                                  className="bg-green-100 text-green-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-green-200 transition-colors"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusUpdate(u, "Rejected");
+                                  }}
+                                  className="bg-red-100 text-red-700 px-3 py-1 rounded-md text-xs font-semibold hover:bg-red-200 transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                            {u.status !== 'PENDING' && <span className="text-gray-400">-</span>}
+                          </div>
+                        </td>
+                      )}
                     </tr>
 
                     {/* ================= EXTRA DETAILS ================= */}
@@ -1389,9 +1645,11 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
                 ))}
               </tbody>
             </table>
+            )}
           </div>
 
           {/* ================= PAGINATION CONTROLS ================= */}
+          {sortedUsers.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t gap-4">
             <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
               Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
@@ -1453,6 +1711,7 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
             </div>
             <div className="hidden sm:block order-3"></div>
           </div>
+          )}
         </div>
       ) : (
         /* ================= EMPLOYEE MANAGEMENT TAB ================= */
@@ -1688,3 +1947,9 @@ export default function UserManagement({ setIsModalOpen, isSidebarOpen }) {
     </div>
   );
 }
+
+UserManagement.propTypes = {
+  setIsModalOpen: PropTypes.func,
+  isSidebarOpen: PropTypes.bool,
+  activeTab: PropTypes.string
+};

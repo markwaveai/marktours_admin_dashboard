@@ -258,8 +258,8 @@ export default function AdminDashboard({ onLogout }) {
 
         {/* PAGE CONTENT */}
         <main className="overflow-y-auto scrollbar-hide bg-[#eefaff] flex-1 w-full">
-          <div className="w-full sm:px-4 px-1">
-            {React.cloneElement(ActiveComponent, { setIsModalOpen, isSidebarOpen })}
+          <div className="w-full sm:px-4 px-1" >
+            {React.cloneElement(ActiveComponent, { setIsModalOpen, isSidebarOpen, activeTab })}
           </div>
         </main>
       </div>

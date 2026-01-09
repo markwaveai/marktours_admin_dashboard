@@ -5,6 +5,7 @@ import {
     FiTrash2,
     FiSearch,
     FiX,
+    FiInbox,
 } from "react-icons/fi";
 import Pagination from "../Pagination";
 import SkeletonLoader from "../../Common/SkeletonLoader";
@@ -20,6 +21,17 @@ export default function EmployeeManagement({ setIsModalOpen }) {
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+
+    // Debounce Search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setCurrentPage(1); // Reset to page 1 on new search
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [search]);
 
     useEffect(() => {
         if (setIsModalOpen) setIsModalOpen(showForm);
@@ -77,11 +89,6 @@ export default function EmployeeManagement({ setIsModalOpen }) {
         try {
             const res = await fetch(`${API_BASE}/agents/all/details?agent_id=${agentId}&page=1&size=15`);
             const data = await res.json();
-            // API returns paginated structure? User said: ...?agent_id=10155&page=1&size=15
-            // Assuming response has 'users' or 'data'. 
-            // Let's assume standard response structure or check what comes back. 
-            // User didn't specify response structure, but usually it's `data.user_details` or similar.
-            // I'll log it and try to map safely.
             const users = data.user_details || data.users || data.data || [];
             setReferredUsers(users);
         } catch (error) {
@@ -93,25 +100,30 @@ export default function EmployeeManagement({ setIsModalOpen }) {
 
     /* ================= GET ALL AGENTS ================= */
     const fetchAgents = async (page = 1) => {
+        const cacheKey = debouncedSearch ? `search_${debouncedSearch}_${page}` : `page_${page}`;
+
         // Check cache first
-        if (agentsCache[page]) {
-            setEmployeesData(agentsCache[page]);
-            // We assume pagination metadata doesn't change wildly between cached pages, 
-            // but for strict correctness we might want to store metadata in cache too.
-            // For now, we'll just use the cached data.
+        if (agentsCache[cacheKey]) {
+            setEmployeesData(agentsCache[cacheKey].list);
+            setPagination(agentsCache[cacheKey].pagination);
             return;
         }
 
         // Deduplicate requests
-        if (fetchingRef.current === page) return;
-        fetchingRef.current = page;
-
+        // if (fetchingRef.current === page) return; 
+        
         try {
             setLoading(true);
-            const res = await fetch(`${API_BASE}/agents?page=${page}&page_size=15`);
+            let url = `${API_BASE}/agents?page=${page}&page_size=15`;
+            if (debouncedSearch) {
+                url = `${API_BASE}/agents/search?data=${encodeURIComponent(debouncedSearch)}&page=${page}&page_size=15`;
+            }
+
+            const res = await fetch(url);
             const json = await res.json();
 
-            const apiAgents = (json.agents || []).map((a) => ({
+            const rawAgents = json.agents || json.data || []; 
+            const apiAgents = rawAgents.map((a) => ({
                 id: a.agent_id,
                 name: a.name,
                 email: a.email,
@@ -120,63 +132,48 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                 role: "Agent",
             }));
 
-            setEmployeesData(apiAgents);
-            setPagination({
+            const newPagination = {
                 total_records: json.total_records || 0,
                 total_pages: json.total_pages || 1,
                 page_size: json.page_size || 15
-            });
+            };
+
+            setEmployeesData(apiAgents);
+            setPagination(newPagination);
 
             // Update cache
             setAgentsCache(prev => ({
                 ...prev,
-                [page]: apiAgents
+                [cacheKey]: {
+                    list: apiAgents,
+                    pagination: newPagination
+                }
             }));
 
         } catch (err) {
             console.error("Failed to fetch agents", err);
         } finally {
             setLoading(false);
-            fetchingRef.current = null;
         }
     };
 
     useEffect(() => {
         fetchAgents(currentPage);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage]);
+    }, [currentPage, debouncedSearch]);
 
     // Refresh current page (invalidate cache)
     const refreshCurrentPage = async () => {
         const page = currentPage;
+        const cacheKey = debouncedSearch ? `search_${debouncedSearch}_${page}` : `page_${page}`;
+
+        // Invalidate cache for this page
         setAgentsCache(prev => {
             const newCache = { ...prev };
-            delete newCache[page];
+            delete newCache[cacheKey];
             return newCache;
         });
-        // Force fetch since cache for this page is now gone (but we need to wait for state update in theory, 
-        // effectively we can just call fetch ignoring cache or clear cache then fetch)
-        // A simpler way: explicitly fetch and update cache
-        try {
-            setLoading(true);
-            const res = await fetch(`${API_BASE}/agents?page=${page}&page_size=15`);
-            const json = await res.json();
-            const apiAgents = (json.agents || []).map((a) => ({
-                id: a.agent_id,
-                name: a.name,
-                email: a.email,
-                phone: a.mobile,
-                branch: a.branch,
-                role: "Agent",
-            }));
-            setEmployeesData(apiAgents);
-            setPagination({
-                total_records: json.total_records || 0,
-                total_pages: json.total_pages || 1,
-                page_size: json.page_size || 15
-            });
-            setAgentsCache(prev => ({ ...prev, [page]: apiAgents }));
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+        await fetchAgents(page);
     };
 
     /* ================= ADD ================= */
@@ -319,32 +316,20 @@ export default function EmployeeManagement({ setIsModalOpen }) {
         }
     };
 
-    const filteredEmployees = employeesData.filter((e) =>
-        `${e.name} ${e.email} ${e.phone}`
-            .toLowerCase()
-            .includes(search.toLowerCase())
-    );
-    // Server-side pagination means we display filteredEmployees directly (which is the current page)
-    // Client-side slicing removed.
-
-
-
-
-
+    // Client-side filtering removed as API handles it
+    // const filteredEmployees = employeesData ... 
 
     /* ================= UI (UNCHANGED) ================= */
-    if (loading) {
-        return <SkeletonLoader type="table" count={8} />;
-    }
+    // Loading check removed from here to prevent full re-render (losing input focus)
 
     return (
-        <div className="bg-white rounded-xl shadow border border-gray-200">
-            <div className="rounded-2xl">
+        <div className="bg-white rounded-xl shadow border border-gray-200 h-[calc(100vh-75px)] flex flex-col">
+            <div className="rounded-2xl h-full flex flex-col">
                 {/* HEADER */}
-                <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-between items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                <div className="sticky top-0 z-30 bg-white p-6 py-3 flex flex-col sm:flex-row justify-end items-center border-b bg-gradient-to-r from-gray-50 to-white gap-4">
+                    {/* <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                         Employee Management
-                    </h2>
+                    </h2> */}
 
                     <div className="flex gap-3 items-center w-full sm:w-auto">
                         <div className="relative flex-1 sm:flex-initial">
@@ -378,9 +363,21 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                 </div>
 
                 {/* TABLE */}
-                <div className="overflow-x-auto scrollbar-hide">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-100 border-b">
+                <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-hide relative min-h-0">
+                    {loading ? (
+                        <div className="p-4">
+                             <SkeletonLoader type="table" count={8} />
+                        </div>
+                    ) : employeesData.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                             <div className="bg-gray-50 p-6 rounded-full mb-4">
+                                 <FiInbox className="w-10 h-10 text-gray-400" />
+                             </div>
+                             <h3 className="text-lg font-medium text-gray-900">No records found</h3>
+                        </div>
+                    ) : (
+                        <table className="w-full text-sm">
+                        <thead className="bg-gray-100 border-b sticky top-0 z-20">
                             <tr>
                                 {[
                                     "S.No",
@@ -402,7 +399,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredEmployees.map((e, i) => (
+                            {employeesData.map((e, i) => (
                                 <React.Fragment key={e.id}>
                                     <tr
                                         onClick={() => toggleRow(e.id)}
@@ -494,6 +491,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                             ))}
                         </tbody>
                     </table>
+                    )}
                 </div>
 
                 {/* MODAL */}
@@ -666,7 +664,8 @@ export default function EmployeeManagement({ setIsModalOpen }) {
             </div>
 
             {/* ================= PAGINATION CONTROLS ================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-4 border-t gap-4">
+            {employeesData.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center px-6 py-2 border-t gap-4">
                 <div className="text-sm text-gray-500 text-center sm:text-left order-2 sm:order-1">
                     Showing {((currentPage - 1) * pagination.page_size) + 1} to {Math.min(currentPage * pagination.page_size, pagination.total_records)} of {pagination.total_records} entries
                 </div>
@@ -714,6 +713,7 @@ export default function EmployeeManagement({ setIsModalOpen }) {
                 </div>
                 <div className="hidden sm:block order-3"></div>
             </div>
+            )}
         </div >
     );
 }
